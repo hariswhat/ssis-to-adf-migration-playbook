@@ -1,0 +1,163 @@
+{
+  "name": "pl_stage_orders",
+  "properties": {
+    "description": "Converted from SSIS package Stage_Orders by playbook.convert.",
+    "activities": [
+      {
+        "name": "Get watermark",
+        "type": "Lookup",
+        "dependsOn": [],
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sqlReaderQuery": "SELECT CONVERT(VARCHAR(23), MAX(watermark_at), 121) AS last_watermark FROM etl.watermark WHERE table_name = 'order_line'"
+          },
+          "dataset": {
+            "referenceName": "ds_dw_query",
+            "type": "DatasetReference"
+          },
+          "firstRowOnly": true
+        }
+      },
+      {
+        "name": "Set LastWatermark",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Get watermark",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "LastWatermark",
+          "value": {
+            "value": "@string(activity('Get watermark').output.firstRow.last_watermark)",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Copy new order lines",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "Set SourceQuery",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "Set LastWatermark",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "inputs": [
+          {
+            "referenceName": "ds_erp_query",
+            "type": "DatasetReference"
+          }
+        ],
+        "outputs": [
+          {
+            "referenceName": "ds_dw_table",
+            "type": "DatasetReference",
+            "parameters": {
+              "schema": "stg",
+              "table": "order_line"
+            }
+          }
+        ],
+        "typeProperties": {
+          "source": {
+            "type": "SqlServerSource",
+            "sqlReaderQuery": {
+              "value": "@variables('SourceQuery')",
+              "type": "Expression"
+            }
+          },
+          "sink": {
+            "type": "AzureSqlSink",
+            "writeBehavior": "insert",
+            "tableOption": "none"
+          }
+        }
+      },
+      {
+        "name": "Set SourceQuery",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Set LastWatermark",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "SourceQuery",
+          "value": {
+            "value": "@concat('SELECT order_id, line_number, customer_code, product_code, order_date, quantity, unit_price, modified_at FROM dbo.order_line WHERE modified_at > ''', variables('LastWatermark'), '''')",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "If Set watermark",
+        "type": "IfCondition",
+        "description": "SSIS precedence constraint expression: @[User::RowsCopied] > 0",
+        "dependsOn": [
+          {
+            "activity": "Copy new order lines",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "value": "@greater(activity('Copy new order lines').output.rowsCopied, 0)",
+            "type": "Expression"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "Set watermark",
+              "type": "Script",
+              "dependsOn": [],
+              "linkedServiceName": {
+                "referenceName": "ls_dw_azuresql",
+                "type": "LinkedServiceReference"
+              },
+              "typeProperties": {
+                "scripts": [
+                  {
+                    "type": "NonQuery",
+                    "text": "UPDATE etl.watermark SET watermark_at = (SELECT MAX(modified_at) FROM stg.order_line) WHERE table_name = 'order_line';"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "parameters": {},
+    "variables": {
+      "LastWatermark": {
+        "type": "String"
+      },
+      "SourceQuery": {
+        "type": "String"
+      },
+      "RowsCopied": {
+        "type": "String"
+      }
+    },
+    "annotations": [
+      "converted-from-ssis"
+    ]
+  }
+}

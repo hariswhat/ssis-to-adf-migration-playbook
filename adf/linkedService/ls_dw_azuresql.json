@@ -1,0 +1,10 @@
+{
+  "name": "ls_dw_azuresql",
+  "properties": {
+    "type": "AzureSqlDatabase",
+    "typeProperties": {
+      "connectionString": "Data Source=sql-ngbp-dw-dev.database.windows.net;Initial Catalog=NorthgateDW",
+      "authenticationType": "SystemAssignedManagedIdentity"
+    }
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "name": "pl_load_dimcustomer",
+  "properties": {
+    "description": "Converted from SSIS package Load_DimCustomer by playbook.convert.",
+    "activities": [
+      {
+        "name": "SCD customer",
+        "type": "SqlServerStoredProcedure",
+        "dependsOn": [],
+        "description": "Set-based rewrite of the SSIS data flow 'SCD customer'.",
+        "linkedServiceName": {
+          "referenceName": "ls_dw_azuresql",
+          "type": "LinkedServiceReference"
+        },
+        "typeProperties": {
+          "storedProcedureName": "etl.usp_load_dim_customer"
+        }
+      },
+      {
+        "name": "Alert SCD customer failed",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "SCD customer",
+            "dependencyConditions": [
+              "Failed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "method": "POST",
+          "url": {
+            "value": "@pipeline().globalParameters.alertLogicAppUrl",
+            "type": "Expression"
+          },
+          "body": {
+            "value": "@json(concat('{\"pipeline\": \"', pipeline().Pipeline, '\", \"activity\": \"SCD customer\", \"run\": \"', pipeline().RunId, '\"}'))",
+            "type": "Expression"
+          }
+        }
+      }
+    ],
+    "parameters": {},
+    "variables": {},
+    "annotations": [
+      "converted-from-ssis"
+    ]
+  }
+}

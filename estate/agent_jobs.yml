@@ -1,0 +1,8 @@
+# SQL Server Agent jobs that run packages from the SSIS catalog, exported from
+# msdb (fictional). The assessment treats a package as in use if a job runs it
+# or another package calls it.
+jobs:
+  - name: Northgate nightly ETL
+    schedule: daily 01:30
+    steps:
+      - package: NorthgateETL/Master_Nightly.dtsx

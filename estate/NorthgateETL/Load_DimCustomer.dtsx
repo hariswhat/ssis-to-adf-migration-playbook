@@ -1,0 +1,86 @@
+<?xml version="1.0"?>
+<DTS:Executable xmlns:DTS="www.microsoft.com/SqlServer/Dts" DTS:refId="Package" DTS:CreationName="Microsoft.Package" DTS:DTSID="{14CBCCCE-EC45-5726-B09B-ECC320710487}" DTS:ExecutableType="Microsoft.Package" DTS:LastModifiedProductVersion="13.0.5893.48" DTS:LocaleID="1033" DTS:ObjectName="Load_DimCustomer" DTS:PackageType="5" DTS:VersionBuild="1" DTS:VersionGUID="{63369A53-8A0D-508C-93F8-22EB2450C7AB}">
+  <DTS:Property DTS:Name="PackageFormatVersion">8</DTS:Property>
+  <DTS:ConnectionManagers>
+    <DTS:ConnectionManager DTS:refId="Package.ConnectionManagers[DW]" DTS:CreationName="OLEDB" DTS:DTSID="{B895158F-254A-5317-A8A8-AB07EBCE7EE1}" DTS:ObjectName="DW">
+      <DTS:PropertyExpression DTS:Name="ConnectionString">@[$Project::DW_ConnectionString]</DTS:PropertyExpression>
+      <DTS:ObjectData>
+        <DTS:ConnectionManager DTS:ConnectionString="Data Source=DWSQL01;Initial Catalog=NorthgateDW;Provider=SQLNCLI11.1;Integrated Security=SSPI;" />
+      </DTS:ObjectData>
+    </DTS:ConnectionManager>
+  </DTS:ConnectionManagers>
+  <DTS:Executables>
+    <DTS:Executable DTS:refId="Package\SCD customer" DTS:CreationName="Microsoft.Pipeline" DTS:DTSID="{0EF86635-C372-58F2-9B40-1EC2EDD17377}" DTS:ExecutableType="Microsoft.Pipeline" DTS:ObjectName="SCD customer">
+      <DTS:ObjectData>
+        <pipeline version="1">
+          <components>
+            <component refId="Package\SCD customer\stg customer" componentClassID="Microsoft.OLEDBSource" name="stg customer">
+              <properties>
+                <property name="AccessMode">0</property>
+                <property name="OpenRowset">[stg].[customer]</property>
+              </properties>
+              <connections>
+                <connection refId="Package\SCD customer\stg customer.Connections[OleDbConnection]" connectionManagerID="Package.ConnectionManagers[DW]" connectionManagerRefId="Package.ConnectionManagers[DW]" name="OleDbConnection" />
+              </connections>
+            </component>
+            <component refId="Package\SCD customer\Slowly Changing Dimension" componentClassID="Microsoft.SCD" name="Slowly Changing Dimension">
+              <properties>
+                <property name="SqlCommand">SELECT customer_key, customer_code, customer_name, region, tier, valid_from, valid_to, is_current FROM dw.dim_customer</property>
+                <property name="CurrentRowWhere">[is_current] = 1</property>
+                <property name="HistoricalAttributes">region,tier</property>
+                <property name="ChangingAttributes">customer_name</property>
+                <property name="BusinessKey">customer_code</property>
+                <property name="IncomingRowChangeType">1</property>
+              </properties>
+              <connections>
+                <connection refId="Package\SCD customer\Slowly Changing Dimension.Connections[OleDbConnection]" connectionManagerID="Package.ConnectionManagers[DW]" connectionManagerRefId="Package.ConnectionManagers[DW]" name="OleDbConnection" />
+              </connections>
+            </component>
+            <component refId="Package\SCD customer\Expire current row" componentClassID="Microsoft.OLEDBCommand" name="Expire current row">
+              <properties>
+                <property name="SqlCommand">UPDATE dw.dim_customer SET valid_to = GETDATE(), is_current = 0 WHERE customer_code = ? AND is_current = 1</property>
+              </properties>
+              <connections>
+                <connection refId="Package\SCD customer\Expire current row.Connections[OleDbConnection]" connectionManagerID="Package.ConnectionManagers[DW]" connectionManagerRefId="Package.ConnectionManagers[DW]" name="OleDbConnection" />
+              </connections>
+            </component>
+            <component refId="Package\SCD customer\Update changing attributes" componentClassID="Microsoft.OLEDBCommand" name="Update changing attributes">
+              <properties>
+                <property name="SqlCommand">UPDATE dw.dim_customer SET customer_name = ? WHERE customer_code = ?</property>
+              </properties>
+              <connections>
+                <connection refId="Package\SCD customer\Update changing attributes.Connections[OleDbConnection]" connectionManagerID="Package.ConnectionManagers[DW]" connectionManagerRefId="Package.ConnectionManagers[DW]" name="OleDbConnection" />
+              </connections>
+            </component>
+            <component refId="Package\SCD customer\Insert new versions" componentClassID="Microsoft.OLEDBDestination" name="Insert new versions">
+              <properties>
+                <property name="AccessMode">3</property>
+                <property name="OpenRowset">[dw].[dim_customer]</property>
+              </properties>
+              <connections>
+                <connection refId="Package\SCD customer\Insert new versions.Connections[OleDbConnection]" connectionManagerID="Package.ConnectionManagers[DW]" connectionManagerRefId="Package.ConnectionManagers[DW]" name="OleDbConnection" />
+              </connections>
+            </component>
+          </components>
+          <paths>
+            <path refId="Package\SCD customer.Paths[stg customer to Slowly Changing Dimension]" startId="Package\SCD customer\stg customer.Outputs[Output]" endId="Package\SCD customer\Slowly Changing Dimension.Inputs[Input]" name="stg customer to Slowly Changing Dimension" />
+            <path refId="Package\SCD customer.Paths[Slowly Changing Dimension to Expire current row]" startId="Package\SCD customer\Slowly Changing Dimension.Outputs[Output]" endId="Package\SCD customer\Expire current row.Inputs[Input]" name="Slowly Changing Dimension to Expire current row" />
+            <path refId="Package\SCD customer.Paths[Slowly Changing Dimension to Update changing attributes]" startId="Package\SCD customer\Slowly Changing Dimension.Outputs[Output]" endId="Package\SCD customer\Update changing attributes.Inputs[Input]" name="Slowly Changing Dimension to Update changing attributes" />
+            <path refId="Package\SCD customer.Paths[Expire current row to Insert new versions]" startId="Package\SCD customer\Expire current row.Outputs[Output]" endId="Package\SCD customer\Insert new versions.Inputs[Input]" name="Expire current row to Insert new versions" />
+          </paths>
+        </pipeline>
+      </DTS:ObjectData>
+    </DTS:Executable>
+  </DTS:Executables>
+  <DTS:EventHandlers>
+    <DTS:EventHandler DTS:refId="Package.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{D07C26F5-8BA7-53F0-BDF2-46DD98925C06}" DTS:EventName="OnError">
+      <DTS:Executables>
+      <DTS:Executable DTS:refId="Package.EventHandlers[OnError]\Mail on error" DTS:CreationName="Microsoft.SendMailTask" DTS:DTSID="{7B2B4567-E736-5875-A726-A1F70C489C96}" DTS:ExecutableType="Microsoft.SendMailTask" DTS:ObjectName="Mail on error">
+        <DTS:ObjectData>
+        <SendMailTask:SendMailTaskData SendMailTask:SMTPServer="{2F1E6247-7B81-5BBF-9753-C8418040B0F1}" SendMailTask:From="etl@northgate.example" SendMailTask:To="dataops@northgate.example" SendMailTask:Subject="Load_DimCustomer failed" xmlns:SendMailTask="www.microsoft.com/sqlserver/dts/tasks/sendmailtask" />
+        </DTS:ObjectData>
+      </DTS:Executable>
+      </DTS:Executables>
+    </DTS:EventHandler>
+  </DTS:EventHandlers>
+</DTS:Executable>

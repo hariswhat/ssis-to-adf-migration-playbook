@@ -1,0 +1,32 @@
+{
+  "name": "pl_export_plantextract",
+  "properties": {
+    "description": "Runs SSIS package Export_PlantExtract unchanged on the Azure-SSIS IR until it is rewritten (docs/adr/0001).",
+    "activities": [
+      {
+        "name": "Run Export_PlantExtract",
+        "type": "ExecuteSSISPackage",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.02:00:00",
+          "retry": 0
+        },
+        "typeProperties": {
+          "packageLocation": {
+            "type": "SSISDB",
+            "packagePath": "NorthgateETL/NorthgateETL/Export_PlantExtract.dtsx"
+          },
+          "runtime": "x64",
+          "loggingLevel": "Basic",
+          "connectVia": {
+            "referenceName": "ir-azure-ssis",
+            "type": "IntegrationRuntimeReference"
+          }
+        }
+      }
+    ],
+    "annotations": [
+      "azure-ssis-ir"
+    ]
+  }
+}

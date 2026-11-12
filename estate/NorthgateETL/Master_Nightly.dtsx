@@ -1,0 +1,60 @@
+<?xml version="1.0"?>
+<DTS:Executable xmlns:DTS="www.microsoft.com/SqlServer/Dts" DTS:refId="Package" DTS:CreationName="Microsoft.Package" DTS:DTSID="{56659CB4-53B3-56ED-AA68-BF94C1762D47}" DTS:ExecutableType="Microsoft.Package" DTS:LastModifiedProductVersion="13.0.5893.48" DTS:LocaleID="1033" DTS:ObjectName="Master_Nightly" DTS:PackageType="5" DTS:VersionBuild="1" DTS:VersionGUID="{35CEDC61-FA58-5548-A37D-32A43B05B1B2}">
+  <DTS:Property DTS:Name="PackageFormatVersion">8</DTS:Property>
+  <DTS:ConnectionManagers>
+    <DTS:ConnectionManager DTS:refId="Package.ConnectionManagers[SMTP]" DTS:CreationName="SMTP" DTS:DTSID="{2F1E6247-7B81-5BBF-9753-C8418040B0F1}" DTS:ObjectName="SMTP">
+      <DTS:ObjectData>
+        <DTS:ConnectionManager DTS:ConnectionString="SmtpServer=smtp.northgate.example;UseWindowsAuthentication=True;" />
+      </DTS:ObjectData>
+    </DTS:ConnectionManager>
+  </DTS:ConnectionManagers>
+  <DTS:Executables>
+    <DTS:Executable DTS:refId="Package\Run Stage_Customers" DTS:CreationName="Microsoft.ExecutePackageTask" DTS:DTSID="{F03D2E0D-BAF2-513D-B4EE-39965D5267E8}" DTS:ExecutableType="Microsoft.ExecutePackageTask" DTS:ObjectName="Run Stage_Customers">
+      <DTS:ObjectData>
+        <ExecutePackageTask><UseProjectReference>True</UseProjectReference><PackageName>Stage_Customers.dtsx</PackageName></ExecutePackageTask>
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable DTS:refId="Package\Run Stage_Orders" DTS:CreationName="Microsoft.ExecutePackageTask" DTS:DTSID="{03C1FDF3-D9C1-503B-A62B-F10831C4226B}" DTS:ExecutableType="Microsoft.ExecutePackageTask" DTS:ObjectName="Run Stage_Orders">
+      <DTS:ObjectData>
+        <ExecutePackageTask><UseProjectReference>True</UseProjectReference><PackageName>Stage_Orders.dtsx</PackageName></ExecutePackageTask>
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable DTS:refId="Package\Run Load_DimCustomer" DTS:CreationName="Microsoft.ExecutePackageTask" DTS:DTSID="{12527082-8DCF-5395-9E1A-AED074E4EC6A}" DTS:ExecutableType="Microsoft.ExecutePackageTask" DTS:ObjectName="Run Load_DimCustomer">
+      <DTS:ObjectData>
+        <ExecutePackageTask><UseProjectReference>True</UseProjectReference><PackageName>Load_DimCustomer.dtsx</PackageName></ExecutePackageTask>
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable DTS:refId="Package\Run Load_FactSales" DTS:CreationName="Microsoft.ExecutePackageTask" DTS:DTSID="{9B8871AB-6E09-5CF6-A980-C240DDEBE2DF}" DTS:ExecutableType="Microsoft.ExecutePackageTask" DTS:ObjectName="Run Load_FactSales">
+      <DTS:ObjectData>
+        <ExecutePackageTask><UseProjectReference>True</UseProjectReference><PackageName>Load_FactSales.dtsx</PackageName></ExecutePackageTask>
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable DTS:refId="Package\Run Import_DealerTargets" DTS:CreationName="Microsoft.ExecutePackageTask" DTS:DTSID="{5746CDD2-5DAF-5A71-99E3-B54708CA6213}" DTS:ExecutableType="Microsoft.ExecutePackageTask" DTS:ObjectName="Run Import_DealerTargets">
+      <DTS:ObjectData>
+        <ExecutePackageTask><UseProjectReference>True</UseProjectReference><PackageName>Import_DealerTargets.dtsx</PackageName></ExecutePackageTask>
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable DTS:refId="Package\Run Export_PlantExtract" DTS:CreationName="Microsoft.ExecutePackageTask" DTS:DTSID="{6864D393-64A9-5F8B-A59D-D865A6D25F74}" DTS:ExecutableType="Microsoft.ExecutePackageTask" DTS:ObjectName="Run Export_PlantExtract">
+      <DTS:ObjectData>
+        <ExecutePackageTask><UseProjectReference>True</UseProjectReference><PackageName>Export_PlantExtract.dtsx</PackageName></ExecutePackageTask>
+      </DTS:ObjectData>
+    </DTS:Executable>
+  </DTS:Executables>
+  <DTS:PrecedenceConstraints>
+    <DTS:PrecedenceConstraint DTS:refId="Package.PrecedenceConstraints[Constraint 0]" DTS:CreationName="" DTS:DTSID="{E327AD85-771A-57CD-9CD5-8627767FBF91}" DTS:From="Package\Run Stage_Customers" DTS:To="Package\Run Load_DimCustomer" DTS:LogicalAnd="True" DTS:ObjectName="Constraint 0" DTS:Value="0" />
+    <DTS:PrecedenceConstraint DTS:refId="Package.PrecedenceConstraints[Constraint 1]" DTS:CreationName="" DTS:DTSID="{D0001C23-19A0-52C4-8AD1-12BBA694A7EE}" DTS:From="Package\Run Stage_Orders" DTS:To="Package\Run Load_FactSales" DTS:LogicalAnd="True" DTS:ObjectName="Constraint 1" DTS:Value="0" />
+    <DTS:PrecedenceConstraint DTS:refId="Package.PrecedenceConstraints[Constraint 2]" DTS:CreationName="" DTS:DTSID="{F31D574A-B493-5239-91EE-DE308C892DAF}" DTS:From="Package\Run Load_DimCustomer" DTS:To="Package\Run Load_FactSales" DTS:LogicalAnd="True" DTS:ObjectName="Constraint 2" DTS:Value="0" />
+    <DTS:PrecedenceConstraint DTS:refId="Package.PrecedenceConstraints[Constraint 3]" DTS:CreationName="" DTS:DTSID="{6142D6C9-DFA2-583D-9151-A1654E1C416C}" DTS:From="Package\Run Load_FactSales" DTS:To="Package\Run Export_PlantExtract" DTS:LogicalAnd="True" DTS:ObjectName="Constraint 3" DTS:Value="0" />
+  </DTS:PrecedenceConstraints>
+  <DTS:EventHandlers>
+    <DTS:EventHandler DTS:refId="Package.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{2565D9C6-52BB-5FED-8D2E-680604D23217}" DTS:EventName="OnError">
+      <DTS:Executables>
+      <DTS:Executable DTS:refId="Package.EventHandlers[OnError]\Mail on error" DTS:CreationName="Microsoft.SendMailTask" DTS:DTSID="{7B2B4567-E736-5875-A726-A1F70C489C96}" DTS:ExecutableType="Microsoft.SendMailTask" DTS:ObjectName="Mail on error">
+        <DTS:ObjectData>
+        <SendMailTask:SendMailTaskData SendMailTask:SMTPServer="{2F1E6247-7B81-5BBF-9753-C8418040B0F1}" SendMailTask:From="etl@northgate.example" SendMailTask:To="dataops@northgate.example" SendMailTask:Subject="Master_Nightly failed" xmlns:SendMailTask="www.microsoft.com/sqlserver/dts/tasks/sendmailtask" />
+        </DTS:ObjectData>
+      </DTS:Executable>
+      </DTS:Executables>
+    </DTS:EventHandler>
+  </DTS:EventHandlers>
+</DTS:Executable>

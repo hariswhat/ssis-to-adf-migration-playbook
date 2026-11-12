@@ -1,0 +1,30 @@
+{
+  "name": "pl_maintenance_purge",
+  "properties": {
+    "description": "Converted from SSIS package Maintenance_Purge by playbook.convert.",
+    "activities": [
+      {
+        "name": "Purge old rejects",
+        "type": "Script",
+        "dependsOn": [],
+        "linkedServiceName": {
+          "referenceName": "ls_dw_azuresql",
+          "type": "LinkedServiceReference"
+        },
+        "typeProperties": {
+          "scripts": [
+            {
+              "type": "NonQuery",
+              "text": "DELETE FROM etl.sales_rejected WHERE rejected_at < DATEADD(DAY, -90, GETDATE());"
+            }
+          ]
+        }
+      }
+    ],
+    "parameters": {},
+    "variables": {},
+    "annotations": [
+      "converted-from-ssis"
+    ]
+  }
+}

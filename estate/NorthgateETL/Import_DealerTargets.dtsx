@@ -1,0 +1,96 @@
+<?xml version="1.0"?>
+<DTS:Executable xmlns:DTS="www.microsoft.com/SqlServer/Dts" DTS:refId="Package" DTS:CreationName="Microsoft.Package" DTS:DTSID="{18A08DD1-6F62-5510-A4DD-5BDB1C0A7FF7}" DTS:ExecutableType="Microsoft.Package" DTS:LastModifiedProductVersion="13.0.5893.48" DTS:LocaleID="1033" DTS:ObjectName="Import_DealerTargets" DTS:PackageType="5" DTS:VersionBuild="1" DTS:VersionGUID="{881F7DAF-175D-5AFB-995F-3DE3F2A38CE4}">
+  <DTS:Property DTS:Name="PackageFormatVersion">8</DTS:Property>
+  <DTS:ConnectionManagers>
+    <DTS:ConnectionManager DTS:refId="Package.ConnectionManagers[DW]" DTS:CreationName="OLEDB" DTS:DTSID="{B895158F-254A-5317-A8A8-AB07EBCE7EE1}" DTS:ObjectName="DW">
+      <DTS:PropertyExpression DTS:Name="ConnectionString">@[$Project::DW_ConnectionString]</DTS:PropertyExpression>
+      <DTS:ObjectData>
+        <DTS:ConnectionManager DTS:ConnectionString="Data Source=DWSQL01;Initial Catalog=NorthgateDW;Provider=SQLNCLI11.1;Integrated Security=SSPI;" />
+      </DTS:ObjectData>
+    </DTS:ConnectionManager>
+    <DTS:ConnectionManager DTS:refId="Package.ConnectionManagers[DealerFile]" DTS:CreationName="FLATFILE" DTS:DTSID="{0194DCA9-2B4B-5CB1-B922-EFBE45ACDD14}" DTS:ObjectName="DealerFile">
+      <DTS:PropertyExpression DTS:Name="ConnectionString">@[User::CurrentFile]</DTS:PropertyExpression>
+      <DTS:ObjectData>
+        <DTS:ConnectionManager DTS:ConnectionString="\\fileshare01\dealers\inbound\dealer_targets.csv" />
+      </DTS:ObjectData>
+    </DTS:ConnectionManager>
+  </DTS:ConnectionManagers>
+  <DTS:Variables>
+    <DTS:Variable DTS:CreationName="" DTS:DTSID="{B1A07C84-087E-59AF-BDB2-BF6EAB325F5E}" DTS:IncludeInDebugDump="2345" DTS:Namespace="User" DTS:ObjectName="CurrentFile">
+      <DTS:VariableValue DTS:DataType="8"></DTS:VariableValue>
+    </DTS:Variable>
+  </DTS:Variables>
+  <DTS:Executables>
+    <DTS:Executable DTS:refId="Package\Truncate stage" DTS:CreationName="Microsoft.ExecuteSQLTask" DTS:DTSID="{E84408FC-2AB1-5FC3-9453-C4B511B28D1F}" DTS:ExecutableType="Microsoft.ExecuteSQLTask" DTS:ObjectName="Truncate stage">
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData SQLTask:Connection="{B895158F-254A-5317-A8A8-AB07EBCE7EE1}" SQLTask:SqlStatementSource="TRUNCATE TABLE stg.dealer_target;" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask">
+        </SQLTask:SqlTaskData>
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable DTS:refId="Package\For each dealer file" DTS:CreationName="STOCK:FOREACHLOOP" DTS:DTSID="{879F527A-00B8-5A63-949A-C8E5209CAFCB}" DTS:ExecutableType="STOCK:FOREACHLOOP" DTS:ObjectName="For each dealer file">
+      <DTS:ForEachEnumerator DTS:CreationName="Microsoft.ForEachFileEnumerator" DTS:ObjectName="File enumerator">
+        <DTS:ObjectData>
+          <ForEachFileEnumeratorProperties>
+            <FEFEProperty Folder="\\fileshare01\dealers\inbound" />
+            <FEFEProperty FileSpec="*.csv" />
+            <FEFEProperty Recurse="false" />
+          </ForEachFileEnumeratorProperties>
+        </DTS:ObjectData>
+      </DTS:ForEachEnumerator>
+      <DTS:ForEachVariableMappings>
+        <DTS:ForEachVariableMapping DTS:CreationName="" DTS:DTSID="{836F7349-2233-52D2-B844-C518F3386022}" DTS:ObjectName="Variable mapping" DTS:ValueIndex="0" DTS:VariableName="User::CurrentFile" />
+      </DTS:ForEachVariableMappings>
+      <DTS:Executables>
+    <DTS:Executable DTS:refId="Package\For each dealer file\Load file" DTS:CreationName="Microsoft.Pipeline" DTS:DTSID="{686EFF5C-B26F-5288-80EC-66FF27719341}" DTS:ExecutableType="Microsoft.Pipeline" DTS:ObjectName="Load file">
+      <DTS:ObjectData>
+        <pipeline version="1">
+          <components>
+            <component refId="Package\For each dealer file\Load file\Dealer CSV" componentClassID="Microsoft.FlatFileSource" name="Dealer CSV">
+              <properties>
+                <property name="FileNameColumnName">source_file</property>
+              </properties>
+              <connections>
+                <connection refId="Package\For each dealer file\Load file\Dealer CSV.Connections[OleDbConnection]" connectionManagerID="Package.ConnectionManagers[DealerFile]" connectionManagerRefId="Package.ConnectionManagers[DealerFile]" name="OleDbConnection" />
+              </connections>
+            </component>
+            <component refId="Package\For each dealer file\Load file\Convert types" componentClassID="Microsoft.DataConvert" name="Convert types">
+              <properties>
+                <property name="Conversions">target_amount:DT_NUMERIC(18,2); month_start:DT_DBDATE</property>
+              </properties>
+            </component>
+            <component refId="Package\For each dealer file\Load file\stg dealer_target" componentClassID="Microsoft.OLEDBDestination" name="stg dealer_target">
+              <properties>
+                <property name="AccessMode">3</property>
+                <property name="OpenRowset">[stg].[dealer_target]</property>
+              </properties>
+              <connections>
+                <connection refId="Package\For each dealer file\Load file\stg dealer_target.Connections[OleDbConnection]" connectionManagerID="Package.ConnectionManagers[DW]" connectionManagerRefId="Package.ConnectionManagers[DW]" name="OleDbConnection" />
+              </connections>
+            </component>
+          </components>
+          <paths>
+            <path refId="Package\For each dealer file\Load file.Paths[Dealer CSV to Convert types]" startId="Package\For each dealer file\Load file\Dealer CSV.Outputs[Output]" endId="Package\For each dealer file\Load file\Convert types.Inputs[Input]" name="Dealer CSV to Convert types" />
+            <path refId="Package\For each dealer file\Load file.Paths[Convert types to stg dealer_target]" startId="Package\For each dealer file\Load file\Convert types.Outputs[Output]" endId="Package\For each dealer file\Load file\stg dealer_target.Inputs[Input]" name="Convert types to stg dealer_target" />
+          </paths>
+        </pipeline>
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable DTS:refId="Package\For each dealer file\Archive file" DTS:CreationName="Microsoft.FileSystemTask" DTS:DTSID="{EA374491-3B1E-57FA-BCF7-2C441FC1B8A3}" DTS:ExecutableType="Microsoft.FileSystemTask" DTS:ObjectName="Archive file">
+      <DTS:ObjectData>
+        <FileSystemData TaskOperationType="MoveFile" TaskSourcePath="User::CurrentFile" TaskDestinationPath="\\fileshare01\dealers\archive" />
+      </DTS:ObjectData>
+    </DTS:Executable>
+      </DTS:Executables>
+    </DTS:Executable>
+    <DTS:Executable DTS:refId="Package\Merge targets" DTS:CreationName="Microsoft.ExecuteSQLTask" DTS:DTSID="{7F3FCA6D-F90C-5F73-84A2-60AD410F3821}" DTS:ExecutableType="Microsoft.ExecuteSQLTask" DTS:ObjectName="Merge targets">
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData SQLTask:Connection="{B895158F-254A-5317-A8A8-AB07EBCE7EE1}" SQLTask:SqlStatementSource="EXEC etl.usp_merge_dealer_target;" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask">
+        </SQLTask:SqlTaskData>
+      </DTS:ObjectData>
+    </DTS:Executable>
+  </DTS:Executables>
+  <DTS:PrecedenceConstraints>
+    <DTS:PrecedenceConstraint DTS:refId="Package.PrecedenceConstraints[Constraint 0]" DTS:CreationName="" DTS:DTSID="{2747DAF6-E876-5D05-80AD-AF696187E1B6}" DTS:From="Package\Truncate stage" DTS:To="Package\For each dealer file" DTS:LogicalAnd="True" DTS:ObjectName="Constraint 0" DTS:Value="0" />
+    <DTS:PrecedenceConstraint DTS:refId="Package.PrecedenceConstraints[Constraint 1]" DTS:CreationName="" DTS:DTSID="{183B05D1-E6F3-541B-AF4C-8C41F72B3B2F}" DTS:From="Package\For each dealer file" DTS:To="Package\Merge targets" DTS:LogicalAnd="True" DTS:ObjectName="Constraint 1" DTS:Value="0" />
+  </DTS:PrecedenceConstraints>
+</DTS:Executable>

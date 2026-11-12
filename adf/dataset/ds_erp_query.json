@@ -1,0 +1,11 @@
+{
+  "name": "ds_erp_query",
+  "properties": {
+    "linkedServiceName": {
+      "referenceName": "ls_erp_sqlserver",
+      "type": "LinkedServiceReference"
+    },
+    "type": "SqlServerTable",
+    "typeProperties": {}
+  }
+}

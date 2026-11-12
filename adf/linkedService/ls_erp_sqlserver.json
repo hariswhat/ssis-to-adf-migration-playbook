@@ -1,0 +1,22 @@
+{
+  "name": "ls_erp_sqlserver",
+  "properties": {
+    "type": "SqlServer",
+    "typeProperties": {
+      "connectionString": "Data Source=ERPSQL01;Initial Catalog=ERP;Integrated Security=False",
+      "userName": "svc_adf_erp_reader",
+      "password": {
+        "type": "AzureKeyVaultSecret",
+        "secretName": "erp-sql-password",
+        "store": {
+          "referenceName": "ls_keyvault",
+          "type": "LinkedServiceReference"
+        }
+      }
+    },
+    "connectVia": {
+      "referenceName": "ir-selfhosted",
+      "type": "IntegrationRuntimeReference"
+    }
+  }
+}

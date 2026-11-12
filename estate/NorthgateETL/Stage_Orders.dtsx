@@ -1,0 +1,84 @@
+<?xml version="1.0"?>
+<DTS:Executable xmlns:DTS="www.microsoft.com/SqlServer/Dts" DTS:refId="Package" DTS:CreationName="Microsoft.Package" DTS:DTSID="{7418DDCA-C52A-59C4-BBE6-0DA9DECA8207}" DTS:ExecutableType="Microsoft.Package" DTS:LastModifiedProductVersion="13.0.5893.48" DTS:LocaleID="1033" DTS:ObjectName="Stage_Orders" DTS:PackageType="5" DTS:VersionBuild="1" DTS:VersionGUID="{80C30C3B-7C96-5716-ACC2-0C45F38B8423}">
+  <DTS:Property DTS:Name="PackageFormatVersion">8</DTS:Property>
+  <DTS:ConnectionManagers>
+    <DTS:ConnectionManager DTS:refId="Package.ConnectionManagers[ERP]" DTS:CreationName="OLEDB" DTS:DTSID="{1BC7877B-7405-5626-BB54-39AF98FE07CF}" DTS:ObjectName="ERP">
+      <DTS:PropertyExpression DTS:Name="ConnectionString">@[$Project::ERP_ConnectionString]</DTS:PropertyExpression>
+      <DTS:ObjectData>
+        <DTS:ConnectionManager DTS:ConnectionString="Data Source=ERPSQL01;Initial Catalog=ERP;Provider=SQLNCLI11.1;Integrated Security=SSPI;" />
+      </DTS:ObjectData>
+    </DTS:ConnectionManager>
+    <DTS:ConnectionManager DTS:refId="Package.ConnectionManagers[DW]" DTS:CreationName="OLEDB" DTS:DTSID="{B895158F-254A-5317-A8A8-AB07EBCE7EE1}" DTS:ObjectName="DW">
+      <DTS:PropertyExpression DTS:Name="ConnectionString">@[$Project::DW_ConnectionString]</DTS:PropertyExpression>
+      <DTS:ObjectData>
+        <DTS:ConnectionManager DTS:ConnectionString="Data Source=DWSQL01;Initial Catalog=NorthgateDW;Provider=SQLNCLI11.1;Integrated Security=SSPI;" />
+      </DTS:ObjectData>
+    </DTS:ConnectionManager>
+  </DTS:ConnectionManagers>
+  <DTS:Variables>
+    <DTS:Variable DTS:CreationName="" DTS:DTSID="{741FF1E8-B930-5048-8AA6-183AE74AC35C}" DTS:IncludeInDebugDump="2345" DTS:Namespace="User" DTS:ObjectName="LastWatermark">
+      <DTS:VariableValue DTS:DataType="8">1900-01-01</DTS:VariableValue>
+    </DTS:Variable>
+    <DTS:Variable DTS:CreationName="" DTS:DTSID="{D158EB97-3C01-5B3E-8982-A55AA9F6DBE8}" DTS:IncludeInDebugDump="2345" DTS:Namespace="User" DTS:ObjectName="SourceQuery" DTS:EvaluateAsExpression="True" DTS:Expression="&quot;SELECT order_id, line_number, customer_code, product_code, order_date, quantity, unit_price, modified_at FROM dbo.order_line WHERE modified_at &gt; '&quot; + @[User::LastWatermark] + &quot;'&quot;">
+      <DTS:VariableValue DTS:DataType="8"></DTS:VariableValue>
+    </DTS:Variable>
+    <DTS:Variable DTS:CreationName="" DTS:DTSID="{1E4EBC4C-3A21-5052-8984-7756143F73E3}" DTS:IncludeInDebugDump="2345" DTS:Namespace="User" DTS:ObjectName="RowsCopied">
+      <DTS:VariableValue DTS:DataType="3">0</DTS:VariableValue>
+    </DTS:Variable>
+  </DTS:Variables>
+  <DTS:Executables>
+    <DTS:Executable DTS:refId="Package\Get watermark" DTS:CreationName="Microsoft.ExecuteSQLTask" DTS:DTSID="{7C09EB90-560C-5258-B088-376BCC72622E}" DTS:ExecutableType="Microsoft.ExecuteSQLTask" DTS:ObjectName="Get watermark">
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData SQLTask:Connection="{B895158F-254A-5317-A8A8-AB07EBCE7EE1}" SQLTask:SqlStatementSource="SELECT CONVERT(VARCHAR(23), MAX(watermark_at), 121) AS last_watermark FROM etl.watermark WHERE table_name = 'order_line'" SQLTask:ResultType="ResultSetType_SingleRow" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask">
+          <SQLTask:ResultBinding SQLTask:ResultName="0" SQLTask:DtsVariableName="User::LastWatermark" />
+        </SQLTask:SqlTaskData>
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable DTS:refId="Package\Copy new order lines" DTS:CreationName="Microsoft.Pipeline" DTS:DTSID="{9758B9C4-F897-5C46-82C8-7DD3BFF697B8}" DTS:ExecutableType="Microsoft.Pipeline" DTS:ObjectName="Copy new order lines">
+      <DTS:ObjectData>
+        <pipeline version="1">
+          <components>
+            <component refId="Package\Copy new order lines\ERP order lines" componentClassID="Microsoft.OLEDBSource" name="ERP order lines">
+              <properties>
+                <property name="AccessMode">3</property>
+                <property name="SqlCommandVariable">User::SourceQuery</property>
+              </properties>
+              <connections>
+                <connection refId="Package\Copy new order lines\ERP order lines.Connections[OleDbConnection]" connectionManagerID="Package.ConnectionManagers[ERP]" connectionManagerRefId="Package.ConnectionManagers[ERP]" name="OleDbConnection" />
+              </connections>
+            </component>
+            <component refId="Package\Copy new order lines\Count rows" componentClassID="Microsoft.RowCount" name="Count rows">
+              <properties>
+                <property name="VariableName">User::RowsCopied</property>
+              </properties>
+            </component>
+            <component refId="Package\Copy new order lines\stg order_line" componentClassID="Microsoft.OLEDBDestination" name="stg order_line">
+              <properties>
+                <property name="AccessMode">3</property>
+                <property name="OpenRowset">[stg].[order_line]</property>
+                <property name="FastLoadOptions">TABLOCK</property>
+              </properties>
+              <connections>
+                <connection refId="Package\Copy new order lines\stg order_line.Connections[OleDbConnection]" connectionManagerID="Package.ConnectionManagers[DW]" connectionManagerRefId="Package.ConnectionManagers[DW]" name="OleDbConnection" />
+              </connections>
+            </component>
+          </components>
+          <paths>
+            <path refId="Package\Copy new order lines.Paths[ERP order lines to Count rows]" startId="Package\Copy new order lines\ERP order lines.Outputs[Output]" endId="Package\Copy new order lines\Count rows.Inputs[Input]" name="ERP order lines to Count rows" />
+            <path refId="Package\Copy new order lines.Paths[Count rows to stg order_line]" startId="Package\Copy new order lines\Count rows.Outputs[Output]" endId="Package\Copy new order lines\stg order_line.Inputs[Input]" name="Count rows to stg order_line" />
+          </paths>
+        </pipeline>
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable DTS:refId="Package\Set watermark" DTS:CreationName="Microsoft.ExecuteSQLTask" DTS:DTSID="{01A7D25B-FF8D-5CCC-9F7D-AA55C81D54E2}" DTS:ExecutableType="Microsoft.ExecuteSQLTask" DTS:ObjectName="Set watermark">
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData SQLTask:Connection="{B895158F-254A-5317-A8A8-AB07EBCE7EE1}" SQLTask:SqlStatementSource="UPDATE etl.watermark SET watermark_at = (SELECT MAX(modified_at) FROM stg.order_line) WHERE table_name = 'order_line';" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask">
+        </SQLTask:SqlTaskData>
+      </DTS:ObjectData>
+    </DTS:Executable>
+  </DTS:Executables>
+  <DTS:PrecedenceConstraints>
+    <DTS:PrecedenceConstraint DTS:refId="Package.PrecedenceConstraints[Constraint 0]" DTS:CreationName="" DTS:DTSID="{59EF5AFD-DE75-51FB-9ADD-3152DBFD609C}" DTS:From="Package\Get watermark" DTS:To="Package\Copy new order lines" DTS:LogicalAnd="True" DTS:ObjectName="Constraint 0" DTS:Value="0" />
+    <DTS:PrecedenceConstraint DTS:refId="Package.PrecedenceConstraints[Constraint 1]" DTS:CreationName="" DTS:DTSID="{3C6773E6-8BBA-5034-BFE0-9A517714A459}" DTS:From="Package\Copy new order lines" DTS:To="Package\Set watermark" DTS:LogicalAnd="True" DTS:ObjectName="Constraint 1" DTS:Value="0" DTS:EvalOp="3" DTS:Expression="@[User::RowsCopied] &gt; 0" />
+  </DTS:PrecedenceConstraints>
+</DTS:Executable>

@@ -1,0 +1,34 @@
+{
+  "name": "ds_fileshare_csv",
+  "properties": {
+    "linkedServiceName": {
+      "referenceName": "ls_fileshare",
+      "type": "LinkedServiceReference"
+    },
+    "type": "DelimitedText",
+    "typeProperties": {
+      "location": {
+        "type": "FileServerLocation",
+        "folderPath": {
+          "value": "@dataset().folder",
+          "type": "Expression"
+        },
+        "fileName": {
+          "value": "@dataset().file",
+          "type": "Expression"
+        }
+      },
+      "columnDelimiter": ",",
+      "firstRowAsHeader": true,
+      "quoteChar": "\""
+    },
+    "parameters": {
+      "folder": {
+        "type": "string"
+      },
+      "file": {
+        "type": "string"
+      }
+    }
+  }
+}

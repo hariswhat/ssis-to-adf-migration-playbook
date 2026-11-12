@@ -1,0 +1,250 @@
+{
+  "name": "pl_master_nightly",
+  "properties": {
+    "description": "Converted from SSIS package Master_Nightly by playbook.convert.",
+    "activities": [
+      {
+        "name": "Run Stage_Customers",
+        "type": "ExecutePipeline",
+        "dependsOn": [],
+        "typeProperties": {
+          "pipeline": {
+            "referenceName": "pl_stage_customers",
+            "type": "PipelineReference"
+          },
+          "waitOnCompletion": true
+        }
+      },
+      {
+        "name": "Run Stage_Orders",
+        "type": "ExecutePipeline",
+        "dependsOn": [],
+        "typeProperties": {
+          "pipeline": {
+            "referenceName": "pl_stage_orders",
+            "type": "PipelineReference"
+          },
+          "waitOnCompletion": true
+        }
+      },
+      {
+        "name": "Run Load_DimCustomer",
+        "type": "ExecutePipeline",
+        "dependsOn": [
+          {
+            "activity": "Run Stage_Customers",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "pipeline": {
+            "referenceName": "pl_load_dimcustomer",
+            "type": "PipelineReference"
+          },
+          "waitOnCompletion": true
+        }
+      },
+      {
+        "name": "Run Load_FactSales",
+        "type": "ExecutePipeline",
+        "dependsOn": [
+          {
+            "activity": "Run Stage_Orders",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "Run Load_DimCustomer",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "pipeline": {
+            "referenceName": "pl_load_factsales",
+            "type": "PipelineReference"
+          },
+          "waitOnCompletion": true
+        }
+      },
+      {
+        "name": "Run Import_DealerTargets",
+        "type": "ExecutePipeline",
+        "dependsOn": [],
+        "typeProperties": {
+          "pipeline": {
+            "referenceName": "pl_import_dealertargets",
+            "type": "PipelineReference"
+          },
+          "waitOnCompletion": true
+        }
+      },
+      {
+        "name": "Run Export_PlantExtract",
+        "type": "ExecutePipeline",
+        "dependsOn": [
+          {
+            "activity": "Run Load_FactSales",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "pipeline": {
+            "referenceName": "pl_export_plantextract",
+            "type": "PipelineReference"
+          },
+          "waitOnCompletion": true
+        }
+      },
+      {
+        "name": "Alert Run Stage_Customers failed",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "Run Stage_Customers",
+            "dependencyConditions": [
+              "Failed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "method": "POST",
+          "url": {
+            "value": "@pipeline().globalParameters.alertLogicAppUrl",
+            "type": "Expression"
+          },
+          "body": {
+            "value": "@json(concat('{\"pipeline\": \"', pipeline().Pipeline, '\", \"activity\": \"Run Stage_Customers\", \"run\": \"', pipeline().RunId, '\"}'))",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Alert Run Stage_Orders failed",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "Run Stage_Orders",
+            "dependencyConditions": [
+              "Failed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "method": "POST",
+          "url": {
+            "value": "@pipeline().globalParameters.alertLogicAppUrl",
+            "type": "Expression"
+          },
+          "body": {
+            "value": "@json(concat('{\"pipeline\": \"', pipeline().Pipeline, '\", \"activity\": \"Run Stage_Orders\", \"run\": \"', pipeline().RunId, '\"}'))",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Alert Run Load_DimCustomer failed",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "Run Load_DimCustomer",
+            "dependencyConditions": [
+              "Failed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "method": "POST",
+          "url": {
+            "value": "@pipeline().globalParameters.alertLogicAppUrl",
+            "type": "Expression"
+          },
+          "body": {
+            "value": "@json(concat('{\"pipeline\": \"', pipeline().Pipeline, '\", \"activity\": \"Run Load_DimCustomer\", \"run\": \"', pipeline().RunId, '\"}'))",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Alert Run Load_FactSales failed",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "Run Load_FactSales",
+            "dependencyConditions": [
+              "Failed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "method": "POST",
+          "url": {
+            "value": "@pipeline().globalParameters.alertLogicAppUrl",
+            "type": "Expression"
+          },
+          "body": {
+            "value": "@json(concat('{\"pipeline\": \"', pipeline().Pipeline, '\", \"activity\": \"Run Load_FactSales\", \"run\": \"', pipeline().RunId, '\"}'))",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Alert Run Import_DealerTargets failed",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "Run Import_DealerTargets",
+            "dependencyConditions": [
+              "Failed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "method": "POST",
+          "url": {
+            "value": "@pipeline().globalParameters.alertLogicAppUrl",
+            "type": "Expression"
+          },
+          "body": {
+            "value": "@json(concat('{\"pipeline\": \"', pipeline().Pipeline, '\", \"activity\": \"Run Import_DealerTargets\", \"run\": \"', pipeline().RunId, '\"}'))",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Alert Run Export_PlantExtract failed",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "Run Export_PlantExtract",
+            "dependencyConditions": [
+              "Failed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "method": "POST",
+          "url": {
+            "value": "@pipeline().globalParameters.alertLogicAppUrl",
+            "type": "Expression"
+          },
+          "body": {
+            "value": "@json(concat('{\"pipeline\": \"', pipeline().Pipeline, '\", \"activity\": \"Run Export_PlantExtract\", \"run\": \"', pipeline().RunId, '\"}'))",
+            "type": "Expression"
+          }
+        }
+      }
+    ],
+    "parameters": {},
+    "variables": {},
+    "annotations": [
+      "converted-from-ssis"
+    ]
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "name": "ir-selfhosted",
+  "properties": {
+    "type": "SelfHosted",
+    "description": "ERP and file share, on-premises"
+  }
+}

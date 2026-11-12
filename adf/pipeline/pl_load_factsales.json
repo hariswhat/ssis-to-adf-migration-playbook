@@ -1,0 +1,49 @@
+{
+  "name": "pl_load_factsales",
+  "properties": {
+    "description": "Converted from SSIS package Load_FactSales by playbook.convert.",
+    "activities": [
+      {
+        "name": "Fact sales",
+        "type": "SqlServerStoredProcedure",
+        "dependsOn": [],
+        "description": "Set-based rewrite of the SSIS data flow 'Fact sales'.",
+        "linkedServiceName": {
+          "referenceName": "ls_dw_azuresql",
+          "type": "LinkedServiceReference"
+        },
+        "typeProperties": {
+          "storedProcedureName": "etl.usp_load_fact_sales"
+        }
+      },
+      {
+        "name": "Alert Fact sales failed",
+        "type": "WebActivity",
+        "dependsOn": [
+          {
+            "activity": "Fact sales",
+            "dependencyConditions": [
+              "Failed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "method": "POST",
+          "url": {
+            "value": "@pipeline().globalParameters.alertLogicAppUrl",
+            "type": "Expression"
+          },
+          "body": {
+            "value": "@json(concat('{\"pipeline\": \"', pipeline().Pipeline, '\", \"activity\": \"Fact sales\", \"run\": \"', pipeline().RunId, '\"}'))",
+            "type": "Expression"
+          }
+        }
+      }
+    ],
+    "parameters": {},
+    "variables": {},
+    "annotations": [
+      "converted-from-ssis"
+    ]
+  }
+}

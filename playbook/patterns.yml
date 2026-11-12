@@ -1,0 +1,109 @@
+# How each SSIS task and data flow component maps to Azure Data Factory, and
+# what it costs to move. Effort is in points: relative size, not hours. A team
+# calibrates points to days after its first wave (docs/adr/0006); nothing here
+# claims a number of days.
+#
+# blocker: true means the item cannot be rewritten mechanically. Packages that
+# contain one run unchanged on the Azure-SSIS integration runtime until they
+# are rewritten (docs/adr/0001).
+#
+# semantics: a difference in behaviour between the SSIS item and its target
+# that reconciliation must check for (docs/adr/0004).
+
+tasks:
+  Microsoft.ExecuteSQLTask:
+    target: Script activity (or Stored Procedure activity for EXEC)
+    effort: 1
+  Microsoft.Pipeline:
+    target: scored by its components
+    effort: 0
+  STOCK:FOREACHLOOP:
+    target: Get Metadata + Filter + ForEach
+    effort: 2
+    note: Only the file enumerator converts directly. ADO and item enumerators become a Lookup feeding the ForEach.
+  STOCK:SEQUENCE:
+    target: nothing; the grouping becomes dependsOn
+    effort: 0
+  Microsoft.ExecutePackageTask:
+    target: Execute Pipeline activity
+    effort: 1
+  Microsoft.SendMailTask:
+    target: Web activity to a Logic App that sends the mail
+    effort: 2
+  Microsoft.FileSystemTask:
+    target: Copy activity then Delete activity (move), or Delete alone
+    effort: 2
+  Microsoft.FtpTask:
+    target: Copy activity with the FTP or SFTP connector
+    effort: 3
+    note: ADF's FTP connector is read-only as a sink; an upload needs SFTP or a Function.
+  Microsoft.ScriptTask:
+    target: Azure Function, or keep on Azure-SSIS IR
+    effort: 8
+    blocker: true
+
+components:
+  Microsoft.OLEDBSource:
+    target: Copy activity source
+    effort: 1
+  Microsoft.OLEDBDestination:
+    target: Copy activity sink
+    effort: 1
+  Microsoft.FlatFileSource:
+    target: Copy activity source, DelimitedText dataset
+    effort: 1
+  Microsoft.RowCount:
+    target: Copy activity output rowsCopied
+    effort: 0
+  Microsoft.DataConvert:
+    target: Copy activity type mapping
+    effort: 1
+  Microsoft.Lookup:
+    target: Join in a stored procedure after a staging copy
+    effort: 3
+    semantics: >-
+      A full-cache Lookup compares strings in .NET: case-sensitive and
+      trailing-space-sensitive. A SQL join under the usual case-insensitive
+      collation matches 'ab', 'AB' and 'ab '. Expect more matches after
+      migration.
+  Microsoft.DerivedColumn:
+    target: Expression in the stored procedure
+    effort: 2
+  Microsoft.ConditionalSplit:
+    target: WHERE clauses on two INSERT statements
+    effort: 2
+  Microsoft.SCD:
+    target: Set-based stored procedure (UPDATE + INSERT, or MERGE)
+    effort: 5
+    semantics: >-
+      The wizard's changing-attribute update rewrites every version of the
+      business key, not only the current one; the set-based rewrite must
+      decide whether to keep that.
+  Microsoft.OLEDBCommand:
+    target: Set-based UPDATE in the stored procedure
+    effort: 3
+    note: Runs one statement per row in SSIS; the rewrite is one statement per load.
+  Microsoft.ManagedComponentHost:
+    target: Rewrite (script component)
+    effort: 8
+    blocker: true
+
+expressions:
+  connection: 1          # property expression on a connection manager
+  variable: 1            # variable evaluated as an expression
+  constraint: 2          # precedence constraint with an expression -> If Condition
+  event_handler: 2       # OnError etc. -> failure paths in the pipeline
+
+unknown_effort: 5        # anything not listed above, flagged for review
+
+bands:                   # total points -> complexity
+  low: 5
+  medium: 15             # above this: high
+
+# Data flows that are rewritten as stored procedures (sql/procedures). The
+# converter calls the procedure in place of the data flow; a complex data flow
+# without an entry here is converted to a call to a placeholder name and
+# listed as manual work.
+rewrites:
+  Load_DimCustomer/SCD customer: etl.usp_load_dim_customer
+  Load_FactSales/Fact sales: etl.usp_load_fact_sales

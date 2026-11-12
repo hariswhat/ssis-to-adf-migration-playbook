@@ -1,0 +1,228 @@
+{
+  "name": "pl_import_dealertargets",
+  "properties": {
+    "description": "Converted from SSIS package Import_DealerTargets by playbook.convert.",
+    "activities": [
+      {
+        "name": "Truncate stage",
+        "type": "Script",
+        "dependsOn": [],
+        "linkedServiceName": {
+          "referenceName": "ls_dw_azuresql",
+          "type": "LinkedServiceReference"
+        },
+        "typeProperties": {
+          "scripts": [
+            {
+              "type": "NonQuery",
+              "text": "TRUNCATE TABLE stg.dealer_target;"
+            }
+          ]
+        }
+      },
+      {
+        "name": "List files",
+        "type": "GetMetadata",
+        "dependsOn": [
+          {
+            "activity": "Truncate stage",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "description": "SSIS ForEach file enumerator over \\\\fileshare01\\dealers\\inbound (*.csv).",
+        "typeProperties": {
+          "dataset": {
+            "referenceName": "ds_fileshare_folder",
+            "type": "DatasetReference",
+            "parameters": {
+              "folder": "@pipeline().parameters.inbound_folder"
+            }
+          },
+          "fieldList": [
+            "childItems"
+          ]
+        }
+      },
+      {
+        "name": "Only matching files",
+        "type": "Filter",
+        "dependsOn": [
+          {
+            "activity": "List files",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "items": {
+            "value": "@activity('List files').output.childItems",
+            "type": "Expression"
+          },
+          "condition": {
+            "value": "@and(equals(item().type, 'File'), endsWith(item().name, '.csv'))",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "For each dealer file",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "Only matching files",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "items": {
+            "value": "@activity('Only matching files').output.value",
+            "type": "Expression"
+          },
+          "isSequential": true,
+          "activities": [
+            {
+              "name": "Load file",
+              "type": "Copy",
+              "dependsOn": [],
+              "inputs": [
+                {
+                  "referenceName": "ds_fileshare_csv",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "folder": "@pipeline().parameters.inbound_folder",
+                    "file": "@item().name"
+                  }
+                }
+              ],
+              "outputs": [
+                {
+                  "referenceName": "ds_dw_table",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "schema": "stg",
+                    "table": "dealer_target"
+                  }
+                }
+              ],
+              "typeProperties": {
+                "source": {
+                  "type": "DelimitedTextSource"
+                },
+                "sink": {
+                  "type": "AzureSqlSink",
+                  "writeBehavior": "insert",
+                  "tableOption": "none"
+                }
+              }
+            },
+            {
+              "name": "Archive file copy",
+              "type": "Copy",
+              "dependsOn": [
+                {
+                  "activity": "Load file",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "inputs": [
+                {
+                  "referenceName": "ds_fileshare_binary",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "folder": "@pipeline().parameters.inbound_folder",
+                    "file": "@item().name"
+                  }
+                }
+              ],
+              "outputs": [
+                {
+                  "referenceName": "ds_fileshare_binary",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "folder": "@pipeline().parameters.archive_folder",
+                    "file": "@item().name"
+                  }
+                }
+              ],
+              "typeProperties": {
+                "source": {
+                  "type": "BinarySource"
+                },
+                "sink": {
+                  "type": "BinarySink"
+                }
+              }
+            },
+            {
+              "name": "Archive file delete",
+              "type": "Delete",
+              "dependsOn": [
+                {
+                  "activity": "Archive file copy",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "typeProperties": {
+                "dataset": {
+                  "referenceName": "ds_fileshare_binary",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "folder": "@pipeline().parameters.inbound_folder",
+                    "file": "@item().name"
+                  }
+                },
+                "enableLogging": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "Merge targets",
+        "type": "SqlServerStoredProcedure",
+        "dependsOn": [
+          {
+            "activity": "For each dealer file",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "linkedServiceName": {
+          "referenceName": "ls_dw_azuresql",
+          "type": "LinkedServiceReference"
+        },
+        "typeProperties": {
+          "storedProcedureName": "etl.usp_merge_dealer_target"
+        }
+      }
+    ],
+    "parameters": {
+      "inbound_folder": {
+        "type": "string",
+        "defaultValue": "dealers/inbound"
+      },
+      "archive_folder": {
+        "type": "string",
+        "defaultValue": "dealers/archive"
+      }
+    },
+    "variables": {
+      "CurrentFile": {
+        "type": "String"
+      }
+    },
+    "annotations": [
+      "converted-from-ssis"
+    ]
+  }
+}

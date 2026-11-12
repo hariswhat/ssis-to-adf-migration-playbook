@@ -1,0 +1,59 @@
+<?xml version="1.0"?>
+<DTS:Executable xmlns:DTS="www.microsoft.com/SqlServer/Dts" DTS:refId="Package" DTS:CreationName="Microsoft.Package" DTS:DTSID="{7B3688B8-44A9-5A5D-AEDD-154D4BC91AAA}" DTS:ExecutableType="Microsoft.Package" DTS:LastModifiedProductVersion="13.0.5893.48" DTS:LocaleID="1033" DTS:ObjectName="Stage_Customers" DTS:PackageType="5" DTS:VersionBuild="1" DTS:VersionGUID="{DF74DB7C-F593-53BA-A9BC-5B7D5900CE6E}">
+  <DTS:Property DTS:Name="PackageFormatVersion">8</DTS:Property>
+  <DTS:ConnectionManagers>
+    <DTS:ConnectionManager DTS:refId="Package.ConnectionManagers[ERP]" DTS:CreationName="OLEDB" DTS:DTSID="{1BC7877B-7405-5626-BB54-39AF98FE07CF}" DTS:ObjectName="ERP">
+      <DTS:PropertyExpression DTS:Name="ConnectionString">@[$Project::ERP_ConnectionString]</DTS:PropertyExpression>
+      <DTS:ObjectData>
+        <DTS:ConnectionManager DTS:ConnectionString="Data Source=ERPSQL01;Initial Catalog=ERP;Provider=SQLNCLI11.1;Integrated Security=SSPI;" />
+      </DTS:ObjectData>
+    </DTS:ConnectionManager>
+    <DTS:ConnectionManager DTS:refId="Package.ConnectionManagers[DW]" DTS:CreationName="OLEDB" DTS:DTSID="{B895158F-254A-5317-A8A8-AB07EBCE7EE1}" DTS:ObjectName="DW">
+      <DTS:PropertyExpression DTS:Name="ConnectionString">@[$Project::DW_ConnectionString]</DTS:PropertyExpression>
+      <DTS:ObjectData>
+        <DTS:ConnectionManager DTS:ConnectionString="Data Source=DWSQL01;Initial Catalog=NorthgateDW;Provider=SQLNCLI11.1;Integrated Security=SSPI;" />
+      </DTS:ObjectData>
+    </DTS:ConnectionManager>
+  </DTS:ConnectionManagers>
+  <DTS:Executables>
+    <DTS:Executable DTS:refId="Package\Truncate stage" DTS:CreationName="Microsoft.ExecuteSQLTask" DTS:DTSID="{E84408FC-2AB1-5FC3-9453-C4B511B28D1F}" DTS:ExecutableType="Microsoft.ExecuteSQLTask" DTS:ObjectName="Truncate stage">
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData SQLTask:Connection="{B895158F-254A-5317-A8A8-AB07EBCE7EE1}" SQLTask:SqlStatementSource="TRUNCATE TABLE stg.customer;" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask">
+        </SQLTask:SqlTaskData>
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable DTS:refId="Package\Copy customers" DTS:CreationName="Microsoft.Pipeline" DTS:DTSID="{4BB56825-78AA-5A7A-85DD-DD7E0679F78E}" DTS:ExecutableType="Microsoft.Pipeline" DTS:ObjectName="Copy customers">
+      <DTS:ObjectData>
+        <pipeline version="1">
+          <components>
+            <component refId="Package\Copy customers\ERP customers" componentClassID="Microsoft.OLEDBSource" name="ERP customers">
+              <properties>
+                <property name="AccessMode">2</property>
+                <property name="SqlCommand">SELECT customer_code, customer_name, region, tier, modified_at FROM dbo.customer</property>
+              </properties>
+              <connections>
+                <connection refId="Package\Copy customers\ERP customers.Connections[OleDbConnection]" connectionManagerID="Package.ConnectionManagers[ERP]" connectionManagerRefId="Package.ConnectionManagers[ERP]" name="OleDbConnection" />
+              </connections>
+            </component>
+            <component refId="Package\Copy customers\stg customer" componentClassID="Microsoft.OLEDBDestination" name="stg customer">
+              <properties>
+                <property name="AccessMode">3</property>
+                <property name="OpenRowset">[stg].[customer]</property>
+                <property name="FastLoadOptions">TABLOCK</property>
+              </properties>
+              <connections>
+                <connection refId="Package\Copy customers\stg customer.Connections[OleDbConnection]" connectionManagerID="Package.ConnectionManagers[DW]" connectionManagerRefId="Package.ConnectionManagers[DW]" name="OleDbConnection" />
+              </connections>
+            </component>
+          </components>
+          <paths>
+            <path refId="Package\Copy customers.Paths[ERP customers to stg customer]" startId="Package\Copy customers\ERP customers.Outputs[Output]" endId="Package\Copy customers\stg customer.Inputs[Input]" name="ERP customers to stg customer" />
+          </paths>
+        </pipeline>
+      </DTS:ObjectData>
+    </DTS:Executable>
+  </DTS:Executables>
+  <DTS:PrecedenceConstraints>
+    <DTS:PrecedenceConstraint DTS:refId="Package.PrecedenceConstraints[Constraint 0]" DTS:CreationName="" DTS:DTSID="{D375CB1B-EF8D-5A8A-BDC2-5D0FE59D2393}" DTS:From="Package\Truncate stage" DTS:To="Package\Copy customers" DTS:LogicalAnd="True" DTS:ObjectName="Constraint 0" DTS:Value="0" />
+  </DTS:PrecedenceConstraints>
+</DTS:Executable>

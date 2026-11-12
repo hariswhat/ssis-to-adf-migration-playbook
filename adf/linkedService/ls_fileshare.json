@@ -1,0 +1,22 @@
+{
+  "name": "ls_fileshare",
+  "properties": {
+    "type": "FileServer",
+    "typeProperties": {
+      "host": "\\\\fileshare01\\dealers",
+      "userId": "NORTHGATE\\svc_adf_files",
+      "password": {
+        "type": "AzureKeyVaultSecret",
+        "secretName": "fileshare-password",
+        "store": {
+          "referenceName": "ls_keyvault",
+          "type": "LinkedServiceReference"
+        }
+      }
+    },
+    "connectVia": {
+      "referenceName": "ir-selfhosted",
+      "type": "IntegrationRuntimeReference"
+    }
+  }
+}

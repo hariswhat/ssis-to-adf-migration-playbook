@@ -1,0 +1,69 @@
+{
+  "name": "pl_stage_customers",
+  "properties": {
+    "description": "Converted from SSIS package Stage_Customers by playbook.convert.",
+    "activities": [
+      {
+        "name": "Truncate stage",
+        "type": "Script",
+        "dependsOn": [],
+        "linkedServiceName": {
+          "referenceName": "ls_dw_azuresql",
+          "type": "LinkedServiceReference"
+        },
+        "typeProperties": {
+          "scripts": [
+            {
+              "type": "NonQuery",
+              "text": "TRUNCATE TABLE stg.customer;"
+            }
+          ]
+        }
+      },
+      {
+        "name": "Copy customers",
+        "type": "Copy",
+        "dependsOn": [
+          {
+            "activity": "Truncate stage",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "inputs": [
+          {
+            "referenceName": "ds_erp_query",
+            "type": "DatasetReference"
+          }
+        ],
+        "outputs": [
+          {
+            "referenceName": "ds_dw_table",
+            "type": "DatasetReference",
+            "parameters": {
+              "schema": "stg",
+              "table": "customer"
+            }
+          }
+        ],
+        "typeProperties": {
+          "source": {
+            "type": "SqlServerSource",
+            "sqlReaderQuery": "SELECT customer_code, customer_name, region, tier, modified_at FROM dbo.customer"
+          },
+          "sink": {
+            "type": "AzureSqlSink",
+            "writeBehavior": "insert",
+            "tableOption": "none"
+          }
+        }
+      }
+    ],
+    "parameters": {},
+    "variables": {},
+    "annotations": [
+      "converted-from-ssis"
+    ]
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "name": "ds_fileshare_folder",
+  "properties": {
+    "linkedServiceName": {
+      "referenceName": "ls_fileshare",
+      "type": "LinkedServiceReference"
+    },
+    "type": "Binary",
+    "typeProperties": {
+      "location": {
+        "type": "FileServerLocation",
+        "folderPath": {
+          "value": "@dataset().folder",
+          "type": "Expression"
+        }
+      }
+    },
+    "parameters": {
+      "folder": {
+        "type": "string"
+      }
+    }
+  }
+}

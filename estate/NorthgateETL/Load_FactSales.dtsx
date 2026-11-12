@@ -1,0 +1,102 @@
+<?xml version="1.0"?>
+<DTS:Executable xmlns:DTS="www.microsoft.com/SqlServer/Dts" DTS:refId="Package" DTS:CreationName="Microsoft.Package" DTS:DTSID="{0D748AD7-2E1A-5FAB-9320-DD827FD39FCE}" DTS:ExecutableType="Microsoft.Package" DTS:LastModifiedProductVersion="13.0.5893.48" DTS:LocaleID="1033" DTS:ObjectName="Load_FactSales" DTS:PackageType="5" DTS:VersionBuild="1" DTS:VersionGUID="{E70F94C5-57EE-5D02-9EDC-378F1B6EAE85}">
+  <DTS:Property DTS:Name="PackageFormatVersion">8</DTS:Property>
+  <DTS:ConnectionManagers>
+    <DTS:ConnectionManager DTS:refId="Package.ConnectionManagers[DW]" DTS:CreationName="OLEDB" DTS:DTSID="{B895158F-254A-5317-A8A8-AB07EBCE7EE1}" DTS:ObjectName="DW">
+      <DTS:PropertyExpression DTS:Name="ConnectionString">@[$Project::DW_ConnectionString]</DTS:PropertyExpression>
+      <DTS:ObjectData>
+        <DTS:ConnectionManager DTS:ConnectionString="Data Source=DWSQL01;Initial Catalog=NorthgateDW;Provider=SQLNCLI11.1;Integrated Security=SSPI;" />
+      </DTS:ObjectData>
+    </DTS:ConnectionManager>
+  </DTS:ConnectionManagers>
+  <DTS:Executables>
+    <DTS:Executable DTS:refId="Package\Fact sales" DTS:CreationName="Microsoft.Pipeline" DTS:DTSID="{BCC7E31C-9F8D-5E0B-8C94-92F869A868DF}" DTS:ExecutableType="Microsoft.Pipeline" DTS:ObjectName="Fact sales">
+      <DTS:ObjectData>
+        <pipeline version="1">
+          <components>
+            <component refId="Package\Fact sales\stg order_line" componentClassID="Microsoft.OLEDBSource" name="stg order_line">
+              <properties>
+                <property name="AccessMode">0</property>
+                <property name="OpenRowset">[stg].[order_line]</property>
+              </properties>
+              <connections>
+                <connection refId="Package\Fact sales\stg order_line.Connections[OleDbConnection]" connectionManagerID="Package.ConnectionManagers[DW]" connectionManagerRefId="Package.ConnectionManagers[DW]" name="OleDbConnection" />
+              </connections>
+            </component>
+            <component refId="Package\Fact sales\Lookup customer" componentClassID="Microsoft.Lookup" name="Lookup customer">
+              <properties>
+                <property name="SqlCommand">SELECT customer_key, customer_code FROM dw.dim_customer WHERE is_current = 1</property>
+                <property name="CacheType">0</property>
+                <property name="NoMatchBehavior">1</property>
+                <property name="JoinColumns">customer_code</property>
+              </properties>
+              <connections>
+                <connection refId="Package\Fact sales\Lookup customer.Connections[OleDbConnection]" connectionManagerID="Package.ConnectionManagers[DW]" connectionManagerRefId="Package.ConnectionManagers[DW]" name="OleDbConnection" />
+              </connections>
+            </component>
+            <component refId="Package\Fact sales\Lookup product" componentClassID="Microsoft.Lookup" name="Lookup product">
+              <properties>
+                <property name="SqlCommand">SELECT product_key, product_code FROM dw.dim_product</property>
+                <property name="CacheType">0</property>
+                <property name="NoMatchBehavior">1</property>
+                <property name="JoinColumns">product_code</property>
+              </properties>
+              <connections>
+                <connection refId="Package\Fact sales\Lookup product.Connections[OleDbConnection]" connectionManagerID="Package.ConnectionManagers[DW]" connectionManagerRefId="Package.ConnectionManagers[DW]" name="OleDbConnection" />
+              </connections>
+            </component>
+            <component refId="Package\Fact sales\Unknown members" componentClassID="Microsoft.DerivedColumn" name="Unknown members">
+              <properties>
+                <property name="Expression">customer_key = ISNULL(customer_key) ? -1 : customer_key; product_key = ISNULL(product_key) ? -1 : product_key; net_amount = quantity * unit_price</property>
+              </properties>
+            </component>
+            <component refId="Package\Fact sales\Split bad quantities" componentClassID="Microsoft.ConditionalSplit" name="Split bad quantities">
+              <properties>
+                <property name="Expression">quantity &lt;= 0</property>
+                <property name="OutputName">Rejected</property>
+              </properties>
+            </component>
+            <component refId="Package\Fact sales\fact_sales" componentClassID="Microsoft.OLEDBDestination" name="fact_sales">
+              <properties>
+                <property name="AccessMode">3</property>
+                <property name="OpenRowset">[dw].[fact_sales]</property>
+                <property name="FastLoadOptions">TABLOCK,CHECK_CONSTRAINTS</property>
+              </properties>
+              <connections>
+                <connection refId="Package\Fact sales\fact_sales.Connections[OleDbConnection]" connectionManagerID="Package.ConnectionManagers[DW]" connectionManagerRefId="Package.ConnectionManagers[DW]" name="OleDbConnection" />
+              </connections>
+            </component>
+            <component refId="Package\Fact sales\sales_rejected" componentClassID="Microsoft.OLEDBDestination" name="sales_rejected">
+              <properties>
+                <property name="AccessMode">3</property>
+                <property name="OpenRowset">[etl].[sales_rejected]</property>
+              </properties>
+              <connections>
+                <connection refId="Package\Fact sales\sales_rejected.Connections[OleDbConnection]" connectionManagerID="Package.ConnectionManagers[DW]" connectionManagerRefId="Package.ConnectionManagers[DW]" name="OleDbConnection" />
+              </connections>
+            </component>
+          </components>
+          <paths>
+            <path refId="Package\Fact sales.Paths[stg order_line to Lookup customer]" startId="Package\Fact sales\stg order_line.Outputs[Output]" endId="Package\Fact sales\Lookup customer.Inputs[Input]" name="stg order_line to Lookup customer" />
+            <path refId="Package\Fact sales.Paths[Lookup customer to Lookup product]" startId="Package\Fact sales\Lookup customer.Outputs[Output]" endId="Package\Fact sales\Lookup product.Inputs[Input]" name="Lookup customer to Lookup product" />
+            <path refId="Package\Fact sales.Paths[Lookup product to Unknown members]" startId="Package\Fact sales\Lookup product.Outputs[Output]" endId="Package\Fact sales\Unknown members.Inputs[Input]" name="Lookup product to Unknown members" />
+            <path refId="Package\Fact sales.Paths[Unknown members to Split bad quantities]" startId="Package\Fact sales\Unknown members.Outputs[Output]" endId="Package\Fact sales\Split bad quantities.Inputs[Input]" name="Unknown members to Split bad quantities" />
+            <path refId="Package\Fact sales.Paths[Split bad quantities to fact_sales]" startId="Package\Fact sales\Split bad quantities.Outputs[Output]" endId="Package\Fact sales\fact_sales.Inputs[Input]" name="Split bad quantities to fact_sales" />
+            <path refId="Package\Fact sales.Paths[Split bad quantities to sales_rejected]" startId="Package\Fact sales\Split bad quantities.Outputs[Output]" endId="Package\Fact sales\sales_rejected.Inputs[Input]" name="Split bad quantities to sales_rejected" />
+          </paths>
+        </pipeline>
+      </DTS:ObjectData>
+    </DTS:Executable>
+  </DTS:Executables>
+  <DTS:EventHandlers>
+    <DTS:EventHandler DTS:refId="Package.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{701F17A1-AAC9-51B1-B4B8-340323018C4E}" DTS:EventName="OnError">
+      <DTS:Executables>
+      <DTS:Executable DTS:refId="Package.EventHandlers[OnError]\Mail on error" DTS:CreationName="Microsoft.SendMailTask" DTS:DTSID="{7B2B4567-E736-5875-A726-A1F70C489C96}" DTS:ExecutableType="Microsoft.SendMailTask" DTS:ObjectName="Mail on error">
+        <DTS:ObjectData>
+        <SendMailTask:SendMailTaskData SendMailTask:SMTPServer="{2F1E6247-7B81-5BBF-9753-C8418040B0F1}" SendMailTask:From="etl@northgate.example" SendMailTask:To="dataops@northgate.example" SendMailTask:Subject="Load_FactSales failed" xmlns:SendMailTask="www.microsoft.com/sqlserver/dts/tasks/sendmailtask" />
+        </DTS:ObjectData>
+      </DTS:Executable>
+      </DTS:Executables>
+    </DTS:EventHandler>
+  </DTS:EventHandlers>
+</DTS:Executable>

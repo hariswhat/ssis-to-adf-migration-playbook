@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<DTS:Executable xmlns:DTS="www.microsoft.com/SqlServer/Dts" DTS:refId="Package" DTS:CreationName="Microsoft.Package" DTS:DTSID="{368DEAEB-D203-5AEA-A217-2C1173E0BF76}" DTS:ExecutableType="Microsoft.Package" DTS:LastModifiedProductVersion="13.0.5893.48" DTS:LocaleID="1033" DTS:ObjectName="Export_PlantExtract" DTS:PackageType="5" DTS:VersionBuild="1" DTS:VersionGUID="{3ECB9C4C-E697-5B69-A0E9-1A6A1F7340AD}">
+  <DTS:Property DTS:Name="PackageFormatVersion">8</DTS:Property>
+  <DTS:ConnectionManagers>
+    <DTS:ConnectionManager DTS:refId="Package.ConnectionManagers[DW]" DTS:CreationName="OLEDB" DTS:DTSID="{B895158F-254A-5317-A8A8-AB07EBCE7EE1}" DTS:ObjectName="DW">
+      <DTS:PropertyExpression DTS:Name="ConnectionString">@[$Project::DW_ConnectionString]</DTS:PropertyExpression>
+      <DTS:ObjectData>
+        <DTS:ConnectionManager DTS:ConnectionString="Data Source=DWSQL01;Initial Catalog=NorthgateDW;Provider=SQLNCLI11.1;Integrated Security=SSPI;" />
+      </DTS:ObjectData>
+    </DTS:ConnectionManager>
+    <DTS:ConnectionManager DTS:refId="Package.ConnectionManagers[PlantFTP]" DTS:CreationName="FTP" DTS:DTSID="{C28E926F-217F-51B7-AB71-4B6C295E73E8}" DTS:ObjectName="PlantFTP">
+      <DTS:ObjectData>
+        <DTS:ConnectionManager DTS:ConnectionString="ftp.plantpartner.example:21" />
+      </DTS:ObjectData>
+    </DTS:ConnectionManager>
+  </DTS:ConnectionManagers>
+  <DTS:Variables>
+    <DTS:Variable DTS:CreationName="" DTS:DTSID="{F83B7F32-FC5B-5EA0-93DD-AA34B28D1E80}" DTS:IncludeInDebugDump="2345" DTS:Namespace="User" DTS:ObjectName="ExtractDate">
+      <DTS:VariableValue DTS:DataType="7">2026-01-01</DTS:VariableValue>
+    </DTS:Variable>
+    <DTS:Variable DTS:CreationName="" DTS:DTSID="{9973B860-A3DD-5364-AC5B-58C6434820DC}" DTS:IncludeInDebugDump="2345" DTS:Namespace="User" DTS:ObjectName="ExtractFile">
+      <DTS:VariableValue DTS:DataType="8"></DTS:VariableValue>
+    </DTS:Variable>
+  </DTS:Variables>
+  <DTS:Executables>
+    <DTS:Executable DTS:refId="Package\Build extract file" DTS:CreationName="Microsoft.ScriptTask" DTS:DTSID="{8BC0562B-76A2-5614-8748-BDC07CA44E31}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:ObjectName="Build extract file">
+      <DTS:ObjectData>
+        <ScriptProject Name="ST_PlantExtract" VSTAMajorVersion="14" VSTAMinorVersion="0" Language="CSharp" ReadOnlyVariables="User::ExtractDate" ReadWriteVariables="User::ExtractFile">
+          <ProjectItem Name="ScriptMain.cs" Encoding="UTF8"><![CDATA[
+public void Main()
+{
+    // Builds the fixed-width extract the plant partner expects:
+    // header record, one record per plant per day, trailer with a checksum.
+    var path = Dts.Variables["User::ExtractFile"].Value.ToString();
+    // ... 140 lines of string formatting and a custom mod-97 checksum ...
+    Dts.TaskResult = (int)ScriptResults.Success;
+}
+]]></ProjectItem>
+        </ScriptProject>
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable DTS:refId="Package\Upload to partner" DTS:CreationName="Microsoft.FtpTask" DTS:DTSID="{F60CC088-4C60-55FC-8852-6567D3994AF6}" DTS:ExecutableType="Microsoft.FtpTask" DTS:ObjectName="Upload to partner">
+      <DTS:ObjectData>
+        <FtpData Operation="Send" LocalPath="User::ExtractFile" RemotePath="/inbound/northgate" Connection="{C28E926F-217F-51B7-AB71-4B6C295E73E8}" />
+      </DTS:ObjectData>
+    </DTS:Executable>
+  </DTS:Executables>
+  <DTS:PrecedenceConstraints>
+    <DTS:PrecedenceConstraint DTS:refId="Package.PrecedenceConstraints[Constraint 0]" DTS:CreationName="" DTS:DTSID="{A0B78254-8EFE-53E0-8F7F-6DD90CB83F62}" DTS:From="Package\Build extract file" DTS:To="Package\Upload to partner" DTS:LogicalAnd="True" DTS:ObjectName="Constraint 0" DTS:Value="0" />
+  </DTS:PrecedenceConstraints>
+</DTS:Executable>

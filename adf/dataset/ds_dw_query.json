@@ -1,0 +1,11 @@
+{
+  "name": "ds_dw_query",
+  "properties": {
+    "linkedServiceName": {
+      "referenceName": "ls_dw_azuresql",
+      "type": "LinkedServiceReference"
+    },
+    "type": "AzureSqlTable",
+    "typeProperties": {}
+  }
+}

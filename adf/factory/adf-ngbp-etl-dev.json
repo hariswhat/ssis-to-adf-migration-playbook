@@ -1,0 +1,11 @@
+{
+  "name": "adf-ngbp-etl-dev",
+  "properties": {
+    "globalParameters": {
+      "alertLogicAppUrl": {
+        "type": "String",
+        "value": "https://logic-ngbp-alerts-dev.example/send"
+      }
+    }
+  }
+}

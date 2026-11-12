@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<DTS:Executable xmlns:DTS="www.microsoft.com/SqlServer/Dts" DTS:refId="Package" DTS:CreationName="Microsoft.Package" DTS:DTSID="{5D8755C8-B2CF-5113-BBBE-8725569CEC89}" DTS:ExecutableType="Microsoft.Package" DTS:LastModifiedProductVersion="13.0.5893.48" DTS:LocaleID="1033" DTS:ObjectName="Maintenance_Purge" DTS:PackageType="5" DTS:VersionBuild="1" DTS:VersionGUID="{5249627A-CF67-5E07-A003-D25DE7B54753}">
+  <DTS:Property DTS:Name="PackageFormatVersion">8</DTS:Property>
+  <DTS:ConnectionManagers>
+    <DTS:ConnectionManager DTS:refId="Package.ConnectionManagers[DW]" DTS:CreationName="OLEDB" DTS:DTSID="{B895158F-254A-5317-A8A8-AB07EBCE7EE1}" DTS:ObjectName="DW">
+      <DTS:PropertyExpression DTS:Name="ConnectionString">@[$Project::DW_ConnectionString]</DTS:PropertyExpression>
+      <DTS:ObjectData>
+        <DTS:ConnectionManager DTS:ConnectionString="Data Source=DWSQL01;Initial Catalog=NorthgateDW;Provider=SQLNCLI11.1;Integrated Security=SSPI;" />
+      </DTS:ObjectData>
+    </DTS:ConnectionManager>
+  </DTS:ConnectionManagers>
+  <DTS:Executables>
+    <DTS:Executable DTS:refId="Package\Purge old rejects" DTS:CreationName="Microsoft.ExecuteSQLTask" DTS:DTSID="{DDA77F88-7DCF-5EC2-890E-CAFB5638E43E}" DTS:ExecutableType="Microsoft.ExecuteSQLTask" DTS:ObjectName="Purge old rejects">
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData SQLTask:Connection="{B895158F-254A-5317-A8A8-AB07EBCE7EE1}" SQLTask:SqlStatementSource="DELETE FROM etl.sales_rejected WHERE rejected_at &lt; DATEADD(DAY, -90, GETDATE());" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask">
+        </SQLTask:SqlTaskData>
+      </DTS:ObjectData>
+    </DTS:Executable>
+  </DTS:Executables>
+</DTS:Executable>

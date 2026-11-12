@@ -1,0 +1,23 @@
+{
+  "name": "ir-azure-ssis",
+  "properties": {
+    "type": "Managed",
+    "description": "Runs packages that cannot be rewritten yet (docs/adr/0001). Billed while running: start before the nightly run, stop after (runbook section 3).",
+    "typeProperties": {
+      "computeProperties": {
+        "location": "EastUS",
+        "nodeSize": "Standard_D2_v3",
+        "numberOfNodes": 1,
+        "maxParallelExecutionsPerNode": 2
+      },
+      "ssisProperties": {
+        "edition": "Standard",
+        "licenseType": "LicenseIncluded",
+        "catalogInfo": {
+          "catalogServerEndpoint": "sql-ngbp-dw-dev.database.windows.net",
+          "catalogPricingTier": "S1"
+        }
+      }
+    }
+  }
+}
