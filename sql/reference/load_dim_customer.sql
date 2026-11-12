@@ -9,7 +9,6 @@ UPDATE dim_customer AS d
 SET customer_name = s.customer_name
 FROM stg_customer AS s
 WHERE UPPER(RTRIM(s.customer_code)) = UPPER(RTRIM(d.customer_code))
-  AND d.is_current = 1
   AND d.customer_name <> s.customer_name;
 
 UPDATE dim_customer AS d

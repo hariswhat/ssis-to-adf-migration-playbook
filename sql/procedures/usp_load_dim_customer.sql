@@ -14,14 +14,15 @@ BEGIN
     SET XACT_ABORT ON;
     BEGIN TRANSACTION;
 
-    -- Type 1: overwrite the name on the current version.
+    -- Type 1: overwrite the name on every version of the customer, as the
+    -- SSIS OLE DB Command did (UPDATE ... WHERE customer_code = ?). Reports
+    -- that group history by name rely on all versions carrying the same one.
     UPDATE d
     SET d.customer_name = s.customer_name
     FROM dw.dim_customer AS d
     INNER JOIN stg.customer AS s
         ON s.customer_code = d.customer_code
-    WHERE d.is_current = 1
-      AND d.customer_name <> s.customer_name;
+    WHERE d.customer_name <> s.customer_name;
 
     -- Type 2: expire the current version where region or tier changed.
     UPDATE d
