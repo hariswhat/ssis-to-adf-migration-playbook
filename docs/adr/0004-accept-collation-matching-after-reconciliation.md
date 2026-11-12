@@ -11,8 +11,18 @@ database's case-insensitive collation (SQL_Latin1_General_CP1_CI_AS) treats
 all three as equal, and `=` ignores trailing spaces.
 
 Order lines typed in lowercase or padded by a CHAR column in the ERP were
-loaded by SSIS against the unknown customer (-1). After the rewrite the same
-lines find their customer.
+loaded by SSIS against the unknown customer (-1). So were the lines of a
+customer whose current dimension row was created from a staged code in
+lowercase: the Slowly Changing Dimension component looks the business key up
+in the database, so it matched the existing customer and inserted the new
+version with the staged spelling, and the cached Lookup then missed every
+order line in uppercase. After the rewrite all of these lines find their
+customer.
+
+Attribute changes are a separate case: the SCD component compares them in
+.NET, case-sensitively, and the procedure does the same with a binary
+collation. Neither detects a change in trailing spaces alone, because SQL
+Server's = ignores them under every collation.
 
 Two choices:
 
@@ -26,13 +36,14 @@ Two choices:
 Accept the new matching. These sales belong to the customer, and the unknown
 member was hiding them. The difference is recorded in
 `reconciliation/accepted.yml` with a matcher that only accepts a difference
-when the order line's code differs from the dimension's by case or trailing
-space and the old side was unknown. Any other difference still fails.
+when the old side was unknown and the order line's code differs from the
+matched dimension row's code only by case or trailing spaces. Any other
+difference still fails.
 
 ## Consequences
 
-- In the reconciliation example 301 differences are accepted (298 in
-  fact_sales and 3 in sales_rejected) and none are left over. Command in the
+- In the reconciliation example 389 differences are accepted (384 in
+  fact_sales and 5 in sales_rejected) and none are left over. Command in the
   README.
 - Revenue by customer goes up for these customers and down for "Unknown" on
   the first night after cutover. Finance needs the reconciliation report

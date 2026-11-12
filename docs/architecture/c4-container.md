@@ -8,10 +8,10 @@ C4Container
 
     System_Boundary(adf, "Data Factory") {
         Container(master, "pl_master_nightly", "Pipeline", "Calls each wave's pipelines in the order Master_Nightly did")
-        Container(stage, "pl_stage_customers, pl_stage_orders", "Pipelines", "Truncate stage, copy from ERP; watermark for order lines")
-        Container(load, "pl_load_dimcustomer, pl_load_factsales", "Pipelines", "One Stored Procedure activity each; Web activity alert on failure")
+        Container(stage, "pl_stage_customers, pl_stage_orders", "Pipelines", "Copy from ERP with a pre-copy truncate; order lines since the watermark")
+        Container(load, "pl_load_dimcustomer, pl_load_factsales", "Pipelines", "One Stored Procedure activity each; alert then Fail on failure; the fact procedure moves the watermark")
         Container(files, "pl_import_dealertargets", "Pipeline", "Get Metadata, Filter, ForEach: copy CSV, archive, merge")
-        Container(lift, "pl_export_plantextract", "Pipeline", "Execute SSIS Package on ir-azure-ssis")
+        Container(lift, "pl_export_plantextract", "Pipeline", "Execute SSIS Package on ir-azure-ssis; during the migration, every package not yet cut over looks like this")
         Container(gp, "alertLogicAppUrl", "Global parameter", "Where failure alerts are posted")
     }
 

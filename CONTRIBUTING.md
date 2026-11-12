@@ -18,15 +18,18 @@ accepted difference, and code style.
 
 1. Write the procedure in `sql/procedures/` (T-SQL, linted by sqlfluff).
    It must be rerunnable (ADR-0003).
-2. Name it under `rewrites:` in `patterns.yml` as `<package>/<data flow>`.
+2. Name it under `rewrites:` in `patterns.yml` as `<package>/<data flow>`,
+   with any parameters the pipeline passes. A task whose work the procedure
+   takes over goes under `moved:`.
 3. For the reconciliation example, add a DuckDB copy in `sql/reference/`
-   with the same statements in the same order.
+   with the same data statements in the same order, and add the pair to
+   `test_reference_sql_follows_the_procedure`.
 
 ## Accepting a difference
 
 Only with an ADR that says why the new behaviour is right. Add a matcher to
 `MATCHERS` in `playbook/reconcile.py` that accepts exactly those differences,
-a test that it does not accept others, and an entry in
+a test that it rejects others, and an entry in
 `reconciliation/accepted.yml`.
 
 ## Style

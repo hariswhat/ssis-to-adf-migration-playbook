@@ -26,10 +26,9 @@ def test_reconciliation_numbers_are_current():
     old, new = reconcile.run_legacy(data), reconcile.run_new(data)
     diffs = reconcile.compare(old, new)
     reconcile.classify(diffs, reconcile.load_accepted())
-    for t in reconcile.TABLES:
-        n = sum(d.table == t for d in diffs)
-        acc = sum(d.table == t and d.accepted_by is not None for d in diffs)
-        assert f"| {t} | {len(old[t]):,} | {len(new[t]):,} | {n:,} | {acc:,} |" in README
+    table = reconcile.report(old, new, diffs, reconcile.load_accepted()).split("\n\n")[0]
+    assert table in README
+    assert all(d.accepted_by for d in diffs)
     assert f"The {len(diffs):,} accepted differences" in README
 
 

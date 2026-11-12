@@ -11,7 +11,7 @@ record that date next to the result.
 
 | Meter | Unit | Quantity for this estate | Source |
 |---|---|---|---|
-| Orchestration, Azure IR | per 1,000 activity runs | 20 per night | `python -m playbook.cost --files 1` |
+| Orchestration, Azure IR | per 1,000 activity runs | 16 per night | `python -m playbook.cost --files 1` |
 | Orchestration, self-hosted IR | per 1,000 activity runs | 6 per night with one dealer file, plus 3 per extra file | same |
 | Data movement, Azure IR | DIU-hours | none: every copy in this factory touches the ERP or the file share, so all of them run on the self-hosted IR | same |
 | Data movement, self-hosted IR | hours of copy execution | 4 copies per night; duration measured in the parallel run | ADF monitoring |
@@ -21,8 +21,10 @@ record that date next to the result.
 | Self-hosted IR | the Windows VM it runs on | existing on-premises VM, or one new VM | not an ADF charge |
 | Warehouse | Azure SQL Database | Not changed by the migration, except during the parallel run (both loads) | |
 
-Failure alerts (Web activities) do not run on a good night and are not
-counted. `Maintenance_Purge` is not counted, because nothing calls it
+The counts are for the converted factory as committed in `adf/` (only
+Export_PlantExtract lifted), on a night where everything succeeds and every
+If Condition is true. Failure alerts and the Fail activities after them
+do not run on a good night and are not counted. `Maintenance_Purge` is not counted, because nothing calls it
 (ADR-0001).
 
 ## Formula
@@ -46,19 +48,21 @@ python -m playbook.cost --files 1 --nights 30 \
 
 ## What dominates
 
-The run counts are small: 26 activity runs a night is under 800 a month.
-While Export_PlantExtract is lifted, the cost is the Azure-SSIS IR's node
-hours and the SSISDB database, and both are fixed costs per night whether
-the package takes one minute or fifty. That is what rewriting the last lifted
+The run counts are small: 22 activity runs a night is 660 in 30 nights.
+While any package is lifted, the cost is the Azure-SSIS IR's node hours and
+the SSISDB database, and both are fixed costs per night whether the packages
+take one minute or fifty. During the migration every package not yet cut
+over runs on the IR (ADR-0005), so the IR's hours per night are highest
+before wave 1 and fall with each wave. That is what rewriting the last lifted
 package saves, and why the IR is started only for the window it is needed
 (runbook section 3).
 
 ## Parallel run
 
-During each wave's parallel run the warehouse executes both loads. If the
-warehouse is close to its DTU or vCore limit at night, size it up for the
-parallel run and back down after the last cutover, rather than letting both
-loads compete.
+Each parallel night adds a database copy (`NorthgateDW_parallel`, billed as
+a database of the same tier while it exists), a second factory's runs, and
+the lifted packages' IR time a second time. Drop the copy between parallel
+windows.
 
 ## What would change this
 

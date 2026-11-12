@@ -13,11 +13,12 @@ The method has four steps, each a module in `playbook/`:
 2. **Plan waves** from table lineage, so that no table has writers on both
    platforms at once. [ADR-0005]
 3. **Convert** the packages to ADF pipeline JSON. Data flows become Copy
-   activities into staging plus set-based stored procedures; packages with a
-   blocker run unchanged on an Azure-SSIS IR until they are rewritten.
-   [ADR-0001, ADR-0002, ADR-0003]
+   activities into staging plus set-based stored procedures. ADF schedules
+   everything from the first night: packages whose wave has not cut over,
+   and packages with a blocker, run unchanged on an Azure-SSIS IR, called
+   from the same master pipeline. [ADR-0001, ADR-0002, ADR-0003]
 4. **Reconcile** the old and new outputs during a parallel run. Every
-   difference is either fixed or accepted in writing. [ADR-0004]
+   difference is either fixed or accepted in writing. [ADR-0004, ADR-0005]
 
 ## The sample estate, assessed
 
@@ -50,7 +51,7 @@ Maintenance_Purge is marked for checking because no SQL Agent job runs it
 | 2 | Load_DimCustomer | Reads stg.customer |
 | 3 | Load_FactSales, Maintenance_Purge | Reads the dimension; both write etl.sales_rejected, so they move together |
 | 4 | Export_PlantExtract | A Script Task hides what it reads and writes |
-| 5 | Master_Nightly | Orchestration only; moves after everything it calls |
+| 5 | Master_Nightly | Orchestration only. Its pipeline orchestrates from the first night (ADR-0005), so this wave is a check that nothing still needs SQL Agent |
 
 ## Conversion
 
@@ -65,7 +66,7 @@ What is converted, and how:
 
 | SSIS | ADF |
 |---|---|
-| Execute SQL Task | Script activity; Stored Procedure activity for `EXEC`; Lookup activity when the result sets a variable |
+| Execute SQL Task | Script activity; Stored Procedure activity for `EXEC`; Lookup activity when the result sets a variable; the Copy's pre-copy script when it only truncates the table that Copy loads |
 | Data flow, copy-shaped (source, row count, destination) | Copy activity; `rowsCopied` replaces the Row Count variable |
 | Data flow that transforms | Stored Procedure activity calling the set-based rewrite in `sql/procedures` |
 | ForEach file loop | Get Metadata, Filter, ForEach |
@@ -73,9 +74,10 @@ What is converted, and how:
 | Execute Package Task | Execute Pipeline (wait on completion) |
 | Precedence constraint with an expression | If Condition |
 | Variable and connection expressions | Pipeline expressions, Key Vault and parameters |
-| OnError event handler | Web activity on each activity's failure path, posting to an alert Logic App |
+| OnError event handler | Web activity on each activity's failure path, posting to an alert Logic App, then a Fail activity so the run still fails |
 | SQL Agent schedule | Schedule trigger |
-| Package with a Script Task | Execute SSIS Package on the Azure-SSIS IR |
+| Stage_Orders "Set watermark" | Left out: the fact procedure moves the watermark in its own transaction (`moved:` in `patterns.yml`, ADR-0003) |
+| Package with a Script Task, or not cut over yet (`--lift`) | Execute SSIS Package on the Azure-SSIS IR, warehouse connection overridden to Azure SQL with managed identity |
 
 ## Reconciliation example
 
@@ -84,26 +86,33 @@ of what the SSIS components do (`playbook/legacy.py`) and a DuckDB copy of the
 new procedures (`sql/reference`). The data has 410 staged customers and 12,000
 order lines, with problems planted where SSIS and SQL disagree.
 
-| Table | SSIS rows | New rows | Differences | Accepted |
-|---|---:|---:|---:|---:|
-| dim_customer | 678 | 678 | 0 | 0 |
-| fact_sales | 11,883 | 11,883 | 298 | 298 |
-| sales_rejected | 117 | 117 | 3 | 3 |
+| Table | Legacy rows | New rows | Duplicate keys | Only legacy | Only new | Column differences | Accepted |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| dim_customer | 678 | 678 | 0 | 0 | 0 | 0 | 0 |
+| fact_sales | 11,883 | 11,883 | 0 | 0 | 0 | 384 | 384 |
+| sales_rejected | 117 | 117 | 0 | 0 | 0 | 5 | 5 |
 
-The 301 accepted differences are order lines whose customer code differs from
-the dimension only by case or a trailing space. The SSIS Lookup missed them
-and loaded them against the unknown customer; the SQL join finds the
-customer. That change was accepted (ADR-0004).
+The 389 accepted differences are order lines whose customer code differs from
+the matched dimension row's code only by case or a trailing space: typed in
+lowercase, padded by a CHAR column, or belonging to a customer whose new
+version was staged in lowercase. The SSIS Lookup missed them and loaded them
+against the unknown customer; the SQL join finds the customer. That change
+was accepted (ADR-0004).
+
+The comparison matches dimension versions by code and position in history,
+compares every column, and reports duplicate keys and fact keys that point
+at no dimension row; tests check that each of these fails the run.
 
 The first version of the dimension procedure applied the type 1 name change
 to the current row only. Reconciliation reported 14 differences in
-dim_customer, because the SSIS wizard was set to update every version. The
-procedure was changed to match (ADR-0003, and the commit history).
+dim_customer (in commit "Add set-based rewrites and a reconciliation
+example"), because the SSIS wizard was set to update every version. The
+procedure was changed to match (ADR-0003).
 
 ## Cost
 
 `python -m playbook.cost --files 1` counts what a nightly run is billed
-for: 20 activity runs on the Azure IR and 6 on the self-hosted IR, plus 3
+for: 16 activity runs on the Azure IR and 6 on the self-hosted IR, plus 3
 more on the self-hosted IR for each additional dealer file. The larger cost is
 the Azure-SSIS IR's node hours and SSISDB while any package is lifted. Prices
 are inputs, not stored; [docs/cost-estimate.md](docs/cost-estimate.md) has
@@ -113,11 +122,11 @@ the formula.
 
 | ADR | Decision |
 |---|---|
-| [0001](docs/adr/0001-rewrite-by-default-azure-ssis-ir-as-a-bridge.md) | Rewrite by default; the Azure-SSIS IR only for packages with a blocker |
+| [0001](docs/adr/0001-rewrite-by-default-azure-ssis-ir-as-a-bridge.md) | Rewrite every package; the Azure-SSIS IR only as a bridge |
 | [0002](docs/adr/0002-transform-in-sql-procedures-not-mapping-data-flows.md) | Transform in stored procedures, not Mapping Data Flows |
 | [0003](docs/adr/0003-set-based-and-rerunnable-procedures.md) | Set-based procedures that can be rerun |
 | [0004](docs/adr/0004-accept-collation-matching-after-reconciliation.md) | Accept the SQL collation's matching after reconciliation |
-| [0005](docs/adr/0005-waves-from-table-lineage-and-parallel-run.md) | Waves from table lineage, parallel run per wave |
+| [0005](docs/adr/0005-waves-from-table-lineage-and-parallel-run.md) | Waves from table lineage; ADF schedules from the first night; parallel run per wave on a database copy |
 | [0006](docs/adr/0006-assessment-as-code.md) | Assessment as code, scored in points |
 
 Also: [context](docs/architecture/c4-context.md) and
@@ -130,7 +139,7 @@ Also: [context](docs/architecture/c4-context.md) and
 
 ```bash
 make setup       # Python 3.11+, pinned requirements, pre-commit hooks
-make test        # 50 tests, about 1 s
+make test        # 63 tests, about 2 s
 make assess      # table above, plus assessment.csv with one row per item
 make waves
 make convert     # regenerate adf/
@@ -142,11 +151,15 @@ make lint        # ruff, sqlfluff on sql/procedures
 ## Known limitations
 
 - Nothing has been deployed to Azure. The factory JSON is checked for
-  internal consistency, not by an ADF deployment (open issue 8).
+  internal consistency, not by an ADF deployment (open issue 12).
 - The reconciliation has run only on generated data, for one night, against
   an emulation of SSIS rather than SSIS itself (open issues 2 and 3).
-- The converter handles the constructs in this estate. Other expressions and
-  data flows are listed for manual work rather than guessed (open issue 5).
+- The converter handles the constructs in this estate. Untranslated
+  expressions, OR constraints and EXEC arguments are listed as manual items;
+  a transforming data flow with no rewrite named in `patterns.yml` becomes a
+  call to a placeholder procedure, also listed (open issue 9).
+- Environment values (server names, folders) are constants in the generated
+  JSON (open issue 6).
 - Lineage is read from SQL text with regular expressions; dynamic SQL and
   views are invisible to it.
 - The Azure-SSIS IR is started and stopped by hand (open issue 1).

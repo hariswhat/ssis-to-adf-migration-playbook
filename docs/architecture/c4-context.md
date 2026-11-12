@@ -17,8 +17,8 @@ C4Context
 
     System_Boundary(onprem, "On premises") {
         System(ssis, "SSIS catalog + SQL Agent", "NorthgateETL project, 8 packages, Master_Nightly at 01:30")
-        SystemDb(dw, "NorthgateDW", "SQL Server warehouse")
     }
+    SystemDb(dw, "NorthgateDW", "Warehouse, already moved to Azure SQL Database")
 
     Rel(ssis, erp, "Reads")
     Rel(ssis, share, "Reads and archives CSVs")
