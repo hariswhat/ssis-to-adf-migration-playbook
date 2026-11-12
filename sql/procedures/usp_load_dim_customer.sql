@@ -7,11 +7,14 @@
 -- spaces, unlike the SSIS component (docs/adr/0004).
 
 CREATE OR ALTER PROCEDURE etl.usp_load_dim_customer
-    @load_ts DATETIME2(0)
+    @load_ts DATETIME2(0) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
+    -- The SSIS expire command used GETDATE(). The pipeline calls this without
+    -- a value; Azure SQL Database runs in UTC, so this is the same clock.
+    SET @load_ts = ISNULL(@load_ts, SYSUTCDATETIME());
     BEGIN TRANSACTION;
 
     -- Type 1: overwrite the name on every version of the customer, as the

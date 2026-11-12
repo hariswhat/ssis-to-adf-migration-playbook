@@ -15,6 +15,20 @@ BEGIN
     SET XACT_ABORT ON;
     BEGIN TRANSACTION;
 
+    -- Replace lines already loaded, so a rerun or a line modified in the ERP
+    -- does not add a second row. The SSIS package only appended (docs/adr/0003).
+    DELETE f
+    FROM dw.fact_sales AS f
+    INNER JOIN stg.order_line AS ol
+        ON ol.order_id = f.order_id
+       AND ol.line_number = f.line_number;
+
+    DELETE r
+    FROM etl.sales_rejected AS r
+    INNER JOIN stg.order_line AS ol
+        ON ol.order_id = r.order_id
+       AND ol.line_number = r.line_number;
+
     INSERT INTO etl.sales_rejected
     (
           order_id, line_number, customer_code, customer_key, product_key

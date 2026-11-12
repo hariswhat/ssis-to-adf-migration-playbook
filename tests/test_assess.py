@@ -28,9 +28,9 @@ def test_scheduled_and_called():
     assert scheduled_packages(ESTATE.parent / "missing.yml") == set()
 
 
-def test_effort_totals_match_readme_numbers():
+def test_effort_totals():
     a = by_name()
-    assert sum(x.effort for x in a.values()) == 79
+    assert sum(x.effort for x in a.values()) == 80
     assert a["Load_DimCustomer"].complexity == "high"
     assert a["Stage_Customers"].complexity == "low"
 
@@ -54,4 +54,4 @@ def test_unknown_task_gets_default_effort(packages):
 
 def test_markdown_summary_line():
     text = markdown(assess_project(ESTATE))
-    assert "8 packages, 79 points." in text
+    assert "8 packages, 80 points." in text

@@ -255,6 +255,7 @@ def build() -> dict[str, str]:
         ["ERP", "DW"],
         "\n".join(
             [
+                sql_task(P, "Truncate stage", "DW", "TRUNCATE TABLE stg.order_line;"),
                 sql_task(
                     P,
                     "Get watermark",
@@ -302,6 +303,7 @@ def build() -> dict[str, str]:
             "SourceQuery": '"SELECT order_id, line_number, customer_code, product_code, order_date, quantity, unit_price, modified_at FROM dbo.order_line WHERE modified_at > \'" + @[User::LastWatermark] + "\'"'
         },
         pcs=[
+            ("Truncate stage", "Get watermark", 0, None),
             ("Get watermark", "Copy new order lines", 0, None),
             ("Copy new order lines", "Set watermark", 0, "@[User::RowsCopied] > 0"),
         ],

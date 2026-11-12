@@ -4,9 +4,33 @@
     "description": "Converted from SSIS package Stage_Orders by playbook.convert.",
     "activities": [
       {
+        "name": "Truncate stage",
+        "type": "Script",
+        "dependsOn": [],
+        "linkedServiceName": {
+          "referenceName": "ls_dw_azuresql",
+          "type": "LinkedServiceReference"
+        },
+        "typeProperties": {
+          "scripts": [
+            {
+              "type": "NonQuery",
+              "text": "TRUNCATE TABLE stg.order_line;"
+            }
+          ]
+        }
+      },
+      {
         "name": "Get watermark",
         "type": "Lookup",
-        "dependsOn": [],
+        "dependsOn": [
+          {
+            "activity": "Truncate stage",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
         "typeProperties": {
           "source": {
             "type": "AzureSqlSource",

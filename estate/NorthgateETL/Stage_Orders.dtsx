@@ -27,6 +27,12 @@
     </DTS:Variable>
   </DTS:Variables>
   <DTS:Executables>
+    <DTS:Executable DTS:refId="Package\Truncate stage" DTS:CreationName="Microsoft.ExecuteSQLTask" DTS:DTSID="{E84408FC-2AB1-5FC3-9453-C4B511B28D1F}" DTS:ExecutableType="Microsoft.ExecuteSQLTask" DTS:ObjectName="Truncate stage">
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData SQLTask:Connection="{B895158F-254A-5317-A8A8-AB07EBCE7EE1}" SQLTask:SqlStatementSource="TRUNCATE TABLE stg.order_line;" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask">
+        </SQLTask:SqlTaskData>
+      </DTS:ObjectData>
+    </DTS:Executable>
     <DTS:Executable DTS:refId="Package\Get watermark" DTS:CreationName="Microsoft.ExecuteSQLTask" DTS:DTSID="{7C09EB90-560C-5258-B088-376BCC72622E}" DTS:ExecutableType="Microsoft.ExecuteSQLTask" DTS:ObjectName="Get watermark">
       <DTS:ObjectData>
         <SQLTask:SqlTaskData SQLTask:Connection="{B895158F-254A-5317-A8A8-AB07EBCE7EE1}" SQLTask:SqlStatementSource="SELECT CONVERT(VARCHAR(23), MAX(watermark_at), 121) AS last_watermark FROM etl.watermark WHERE table_name = 'order_line'" SQLTask:ResultType="ResultSetType_SingleRow" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask">
@@ -78,7 +84,8 @@
     </DTS:Executable>
   </DTS:Executables>
   <DTS:PrecedenceConstraints>
-    <DTS:PrecedenceConstraint DTS:refId="Package.PrecedenceConstraints[Constraint 0]" DTS:CreationName="" DTS:DTSID="{59EF5AFD-DE75-51FB-9ADD-3152DBFD609C}" DTS:From="Package\Get watermark" DTS:To="Package\Copy new order lines" DTS:LogicalAnd="True" DTS:ObjectName="Constraint 0" DTS:Value="0" />
-    <DTS:PrecedenceConstraint DTS:refId="Package.PrecedenceConstraints[Constraint 1]" DTS:CreationName="" DTS:DTSID="{3C6773E6-8BBA-5034-BFE0-9A517714A459}" DTS:From="Package\Copy new order lines" DTS:To="Package\Set watermark" DTS:LogicalAnd="True" DTS:ObjectName="Constraint 1" DTS:Value="0" DTS:EvalOp="3" DTS:Expression="@[User::RowsCopied] &gt; 0" />
+    <DTS:PrecedenceConstraint DTS:refId="Package.PrecedenceConstraints[Constraint 0]" DTS:CreationName="" DTS:DTSID="{3E871A67-59F4-5B40-A271-EA09AAC519BF}" DTS:From="Package\Truncate stage" DTS:To="Package\Get watermark" DTS:LogicalAnd="True" DTS:ObjectName="Constraint 0" DTS:Value="0" />
+    <DTS:PrecedenceConstraint DTS:refId="Package.PrecedenceConstraints[Constraint 1]" DTS:CreationName="" DTS:DTSID="{59EF5AFD-DE75-51FB-9ADD-3152DBFD609C}" DTS:From="Package\Get watermark" DTS:To="Package\Copy new order lines" DTS:LogicalAnd="True" DTS:ObjectName="Constraint 1" DTS:Value="0" />
+    <DTS:PrecedenceConstraint DTS:refId="Package.PrecedenceConstraints[Constraint 2]" DTS:CreationName="" DTS:DTSID="{3C6773E6-8BBA-5034-BFE0-9A517714A459}" DTS:From="Package\Copy new order lines" DTS:To="Package\Set watermark" DTS:LogicalAnd="True" DTS:ObjectName="Constraint 2" DTS:Value="0" DTS:EvalOp="3" DTS:Expression="@[User::RowsCopied] &gt; 0" />
   </DTS:PrecedenceConstraints>
 </DTS:Executable>
