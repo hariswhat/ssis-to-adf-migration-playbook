@@ -2,14 +2,18 @@
 in Python. This is the "before" side of the reconciliation example, written
 from the package definitions:
 
-  * Slowly Changing Dimension component: business key customer_code;
-    historical attributes region and tier (expire the current row, insert a new
-    version); changing attribute customer_name, applied by the OLE DB Command
+  * Slowly Changing Dimension component: business key customer_code, looked
+    up in the database row by row, so it matches under the database collation
+    (case-insensitive, trailing spaces ignored). Attribute changes are
+    detected in .NET, case-sensitively. Historical attributes region and tier
+    (expire the current row, insert a new version); changing attribute
+    customer_name, applied by the OLE DB Command
     "UPDATE dw.dim_customer SET customer_name = ? WHERE customer_code = ?",
     which updates every version of the customer, not only the current one.
   * Lookup components with full cache: an exact .NET string comparison, so
-    'C00042', 'c00042' and 'C00042 ' are three different keys. No match goes
-    to -1 (Derived Column "Unknown members").
+    'C00042', 'c00042' and 'C00042 ' are three different keys. No match is
+    treated as an error and the error is ignored, so the key arrives NULL and
+    the Derived Column "Unknown members" sets it to -1.
   * Conditional Split: quantity <= 0 goes to etl.sales_rejected.
 
 It is an emulation, not SSIS. Its job is to make the behaviour differences
@@ -25,13 +29,19 @@ import pandas as pd
 FAR_FUTURE = datetime(9999, 12, 31)
 
 
+def db_key(code: str) -> str:
+    """How SQL Server's = under a case-insensitive collation sees a code."""
+    return code.rstrip().upper()
+
+
 def scd(dim: pd.DataFrame, stg: pd.DataFrame, load_ts: datetime) -> pd.DataFrame:
     dim = dim.copy()
     next_key = int(dim["customer_key"].max()) + 1
     new_rows = []
-    current = {r.customer_code: r for r in dim[dim["is_current"] == 1].itertuples()}
+    current = {db_key(r.customer_code): r for r in dim[dim["is_current"] == 1].itertuples()}
+    same_key = dim["customer_code"].map(db_key)
     for s in stg.itertuples():
-        cur = current.get(s.customer_code)  # exact match, as the component's lookup
+        cur = current.get(db_key(s.customer_code))  # the component's lookup runs in the database
         if cur is None:
             new_rows.append(
                 {
@@ -49,9 +59,9 @@ def scd(dim: pd.DataFrame, stg: pd.DataFrame, load_ts: datetime) -> pd.DataFrame
             continue
         if s.customer_name != cur.customer_name:
             # OLE DB Command: every version of the business key
-            dim.loc[dim["customer_code"] == s.customer_code, "customer_name"] = s.customer_name
+            dim.loc[same_key == db_key(s.customer_code), "customer_name"] = s.customer_name
         if (s.region, s.tier) != (cur.region, cur.tier):
-            idx = dim.index[(dim["customer_code"] == s.customer_code) & (dim["is_current"] == 1)]
+            idx = dim.index[(same_key == db_key(s.customer_code)) & (dim["is_current"] == 1)]
             dim.loc[idx, ["valid_to", "is_current"]] = [load_ts, 0]
             new_rows.append(
                 {

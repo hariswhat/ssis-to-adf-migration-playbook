@@ -12,3 +12,14 @@ accepted:
       'C00042 ' got the unknown customer (-1). The SQL join uses the database's
       case-insensitive collation and finds the customer. Finance agreed these
       sales belong to the customer.
+
+  - id: load_time
+    matcher: load_time
+    tables: [dim_customer]
+    adr: docs/adr/0005
+    reason: >
+      In a parallel run SSIS stamps new versions with GETDATE() and the
+      pipeline with its trigger time, so the same version's valid_from (and
+      the expired version's valid_to) differ by minutes. Accepted when the two
+      stamps are less than six hours apart; versions are matched by their
+      position in the customer's history, not by timestamp.

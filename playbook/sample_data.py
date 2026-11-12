@@ -8,6 +8,9 @@ Planted on purpose, because they are where SSIS and set-based SQL disagree:
   * customers whose name changed (a type 1 attribute) and who already have
     several versions in the dimension
   * customers whose region or tier changed (type 2)
+  * three of those staged with a lowercase code, as typed in the ERP: the
+    new version keeps that spelling, and a Lookup no longer matches the
+    customer's order lines that use the uppercase code
   * order lines with zero or negative quantity (rejected)
 
     python -m playbook.sample_data --out data
@@ -85,11 +88,18 @@ def generate(seed: int = 11, customers: int = 400, lines: int = 12_000) -> dict[
                 "modified_at": LOAD_TS - timedelta(hours=2),
             }
         )
+    changed = [
+        r
+        for r in stg_rows
+        if r["customer_code"] in current and (r["region"], r["tier"]) != current[r["customer_code"]][1:]
+    ]
+    for r in changed[:3]:
+        r["customer_code"] = r["customer_code"].lower()
     stg_customer = pd.DataFrame(stg_rows)
 
     dim_product = pd.DataFrame([{"product_key": k, "product_code": f"P{k:04d}"} for k in range(1, 201)])
 
-    codes = stg_customer["customer_code"].tolist()
+    codes = stg_customer["customer_code"].str.upper().tolist()
     ol = []
     for n in range(1, lines + 1):
         code = rng.choice(codes)
