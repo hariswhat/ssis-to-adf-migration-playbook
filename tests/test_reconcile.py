@@ -94,7 +94,7 @@ def _statements(path):
     """First keyword of each data statement, skipping session and control
     statements and the lock, which only the T-SQL has."""
     sql = "\n".join(ln for ln in path.read_text().splitlines() if not ln.lstrip().startswith("--"))
-    skip = ("GO", "SET ", "SET\n", "BEGIN", "COMMIT", "END", "DECLARE", "CREATE OR ALTER", "EXEC SP_GETAPPLOCK")
+    skip = ("GO", "SET ", "SET\n", "BEGIN", "COMMIT", "END", "DECLARE", "CREATE OR ALTER", "EXEC @LOCK", "IF @LOCK")
     out = []
     for s in sql.split(";"):
         s = s.strip()

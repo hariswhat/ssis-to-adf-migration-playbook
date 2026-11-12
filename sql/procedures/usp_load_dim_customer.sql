@@ -29,11 +29,17 @@ BEGIN
 
     BEGIN TRANSACTION;
 
-    -- One load at a time: new keys are MAX + ROW_NUMBER.
-    EXEC sp_getapplock
+    -- One load at a time: new keys are MAX + ROW_NUMBER. Wait up to ten
+    -- minutes for another run, then fail rather than block until the
+    -- activity times out.
+    DECLARE @lock INT;
+    EXEC @lock = sp_getapplock
         @Resource = 'etl.usp_load_dim_customer'
         , @LockMode = 'Exclusive'
-        , @LockOwner = 'Transaction';
+        , @LockOwner = 'Transaction'
+        , @LockTimeout = 600000;
+    IF @lock < 0
+        THROW 50001, 'etl.usp_load_dim_customer is already running', 1;
 
     -- Type 1: overwrite the name on every version of the customer.
     UPDATE d

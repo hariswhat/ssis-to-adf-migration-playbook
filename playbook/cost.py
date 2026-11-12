@@ -5,8 +5,9 @@ run on), activity execution time (data movement by DIU-hour on the Azure IR,
 by hour on a self-hosted IR) and Azure-SSIS IR node hours while it is
 running. This walks adf/pipeline from pl_master_nightly and counts the first
 of these for a night where everything succeeds and every If Condition is
-true (the trigger run itself is not an activity run); time-based meters depend on run durations nobody has
-measured yet, so they are inputs.
+true. The trigger run is billed with orchestration too and is added once.
+Time-based meters depend on run durations nobody has measured yet, so they
+are inputs.
 
 Prices are not stored here: they change and vary by region. Pass them from
 the current pricing page to get a monthly figure (docs/cost-estimate.md).
@@ -99,9 +100,10 @@ def main() -> int:  # pragma: no cover
     azure = sum(v for k, v in runs.items() if k.startswith("azure"))
     shir = sum(v for k, v in runs.items() if k.startswith("self-hosted"))
     print(f"\nActivity runs per night: {azure} on the Azure IR, {shir} on the self-hosted IR")
+    print("Trigger runs per night: 1, billed with the Azure IR orchestration runs")
     print(f"Per {a.nights} nights: {azure * a.nights:,} and {shir * a.nights:,}")
     if a.price_azure_run is not None and a.price_shir_run is not None:
-        cost = (azure * a.price_azure_run + shir * a.price_shir_run) * a.nights / 1000
+        cost = ((azure + 1) * a.price_azure_run + shir * a.price_shir_run) * a.nights / 1000
         print(f"Orchestration: {cost:,.2f} per {a.nights} nights")
     if a.ssis_hours is not None and a.price_ssis_node_hour is not None:
         cost = a.ssis_hours * a.ssis_nodes * a.price_ssis_node_hour * a.nights
