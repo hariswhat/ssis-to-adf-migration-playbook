@@ -27,7 +27,8 @@
               <properties>
                 <property name="SqlCommand">SELECT customer_key, customer_code FROM dw.dim_customer WHERE is_current = 1</property>
                 <property name="CacheType">0</property>
-                <property name="NoMatchBehavior">1</property>
+                <property name="NoMatchBehavior">0</property>
+                <property name="ErrorRowDisposition">IgnoreFailure</property>
                 <property name="JoinColumns">customer_code</property>
               </properties>
               <connections>
@@ -38,7 +39,8 @@
               <properties>
                 <property name="SqlCommand">SELECT product_key, product_code FROM dw.dim_product</property>
                 <property name="CacheType">0</property>
-                <property name="NoMatchBehavior">1</property>
+                <property name="NoMatchBehavior">0</property>
+                <property name="ErrorRowDisposition">IgnoreFailure</property>
                 <property name="JoinColumns">product_code</property>
               </properties>
               <connections>
@@ -81,8 +83,8 @@
             <path refId="Package\Fact sales.Paths[Lookup customer to Lookup product]" startId="Package\Fact sales\Lookup customer.Outputs[Output]" endId="Package\Fact sales\Lookup product.Inputs[Input]" name="Lookup customer to Lookup product" />
             <path refId="Package\Fact sales.Paths[Lookup product to Unknown members]" startId="Package\Fact sales\Lookup product.Outputs[Output]" endId="Package\Fact sales\Unknown members.Inputs[Input]" name="Lookup product to Unknown members" />
             <path refId="Package\Fact sales.Paths[Unknown members to Split bad quantities]" startId="Package\Fact sales\Unknown members.Outputs[Output]" endId="Package\Fact sales\Split bad quantities.Inputs[Input]" name="Unknown members to Split bad quantities" />
-            <path refId="Package\Fact sales.Paths[Split bad quantities to fact_sales]" startId="Package\Fact sales\Split bad quantities.Outputs[Output]" endId="Package\Fact sales\fact_sales.Inputs[Input]" name="Split bad quantities to fact_sales" />
-            <path refId="Package\Fact sales.Paths[Split bad quantities to sales_rejected]" startId="Package\Fact sales\Split bad quantities.Outputs[Output]" endId="Package\Fact sales\sales_rejected.Inputs[Input]" name="Split bad quantities to sales_rejected" />
+            <path refId="Package\Fact sales.Paths[Split bad quantities to fact_sales]" startId="Package\Fact sales\Split bad quantities.Outputs[Conditional Split Default Output]" endId="Package\Fact sales\fact_sales.Inputs[Input]" name="Split bad quantities to fact_sales" />
+            <path refId="Package\Fact sales.Paths[Split bad quantities to sales_rejected]" startId="Package\Fact sales\Split bad quantities.Outputs[Rejected]" endId="Package\Fact sales\sales_rejected.Inputs[Input]" name="Split bad quantities to sales_rejected" />
           </paths>
         </pipeline>
       </DTS:ObjectData>

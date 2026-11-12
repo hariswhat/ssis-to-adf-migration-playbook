@@ -133,12 +133,16 @@ def component(df: str, name: str, cls: str, props: dict[str, str], conn: str | N
     return "\n".join(lines)
 
 
-def data_flow(path: str, name: str, comps: list[str], paths: list[tuple[str, str]]) -> str:
+def data_flow(path: str, name: str, comps: list[str], paths: list[tuple[str, ...]]) -> str:
+    """paths: (from, to) or (from, to, output name); the default output is "Output".
+    Simplified: the Lookups' error disposition is written as a component
+    property, where SSIS keeps it on the output."""
     df = f"{path}\\{name}"
     p_lines = [
-        f'            <path refId="{df}.Paths[{a} to {b}]" startId="{df}\\{a}.Outputs[Output]" '
-        f'endId="{df}\\{b}.Inputs[Input]" name="{q(a)} to {q(b)}" />'
-        for a, b in paths
+        f'            <path refId="{df}.Paths[{p[0]} to {p[1]}]" '
+        f'startId="{df}\\{p[0]}.Outputs[{p[2] if len(p) > 2 else "Output"}]" '
+        f'endId="{df}\\{p[1]}.Inputs[Input]" name="{q(p[0])} to {q(p[1])}" />'
+        for p in paths
     ]
     body = (
         '        <pipeline version="1">\n          <components>\n'
@@ -392,7 +396,8 @@ def build() -> dict[str, str]:
                     {
                         "SqlCommand": "SELECT customer_key, customer_code FROM dw.dim_customer WHERE is_current = 1",
                         "CacheType": "0",
-                        "NoMatchBehavior": "1",
+                        "NoMatchBehavior": "0",
+                        "ErrorRowDisposition": "IgnoreFailure",
                         "JoinColumns": "customer_code",
                     },
                     "DW",
@@ -404,7 +409,8 @@ def build() -> dict[str, str]:
                     {
                         "SqlCommand": "SELECT product_key, product_code FROM dw.dim_product",
                         "CacheType": "0",
-                        "NoMatchBehavior": "1",
+                        "NoMatchBehavior": "0",
+                        "ErrorRowDisposition": "IgnoreFailure",
                         "JoinColumns": "product_code",
                     },
                     "DW",
@@ -447,8 +453,8 @@ def build() -> dict[str, str]:
                 ("Lookup customer", "Lookup product"),
                 ("Lookup product", "Unknown members"),
                 ("Unknown members", "Split bad quantities"),
-                ("Split bad quantities", "fact_sales"),
-                ("Split bad quantities", "sales_rejected"),
+                ("Split bad quantities", "fact_sales", "Conditional Split Default Output"),
+                ("Split bad quantities", "sales_rejected", "Rejected"),
             ],
         ),
         on_error=True,

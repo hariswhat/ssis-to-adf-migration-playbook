@@ -73,6 +73,8 @@ class Constraint:
     target: str
     value: int  # 0 success, 1 failure, 2 completion
     expression: str | None
+    eval_op: int = 2  # 1 expression, 2 constraint, 3 expression and constraint, 4 expression or constraint
+    logical_and: bool = True  # False: the target runs when any incoming constraint is met
 
 
 @dataclass
@@ -189,6 +191,8 @@ def parse(path: Path) -> Package:
                 _a(pc, "To").rsplit("\\", 1)[-1],
                 int(_a(pc, "Value", "0")),
                 _a(pc, "Expression") or None,
+                int(_a(pc, "EvalOp", "2")),
+                _a(pc, "LogicalAnd", "True") == "True",
             )
         )
     return Package(_a(root, "ObjectName") or path.stem, path, conns, variables, tasks, constraints)
