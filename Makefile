@@ -1,7 +1,7 @@
 PY ?= python
 ESTATE ?= estate/NorthgateETL
 
-.PHONY: setup estate assess waves convert reconcile test lint clean
+.PHONY: setup estate assess waves convert cost reconcile test lint clean
 
 setup:
 	$(PY) -m pip install -r requirements-dev.txt
@@ -18,6 +18,9 @@ waves:
 
 convert:         ## regenerate adf/ from the packages
 	$(PY) -m playbook.convert $(ESTATE) --out adf
+
+cost:
+	$(PY) -m playbook.cost --files 1
 
 reconcile:
 	$(PY) -m playbook.reconcile
