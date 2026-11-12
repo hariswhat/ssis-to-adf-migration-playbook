@@ -36,6 +36,12 @@
         }
       }
     ],
+    "parameters": {
+      "run_time": {
+        "type": "string",
+        "defaultValue": ""
+      }
+    },
     "annotations": [
       "azure-ssis-ir"
     ]

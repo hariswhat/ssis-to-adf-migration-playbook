@@ -109,10 +109,11 @@ rewrites:
     procedure: etl.usp_load_dim_customer
     parameters:
       # SSIS stamped versions with GETDATE() on the on-premises server
-      # (Eastern time). Keep that clock, and one value per run (ADR-0003).
+      # (Eastern time). Keep that clock, and one value per night: the master's
+      # trigger time, passed down as run_time (ADR-0003).
       load_ts:
         type: DateTime
-        value: "@convertFromUtc(pipeline().TriggerTime, 'Eastern Standard Time')"
+        value: "@convertFromUtc(if(empty(pipeline().parameters.run_time), string(pipeline().TriggerTime), pipeline().parameters.run_time), 'Eastern Standard Time')"
   Load_FactSales/Fact sales:
     procedure: etl.usp_load_fact_sales
 
@@ -122,4 +123,8 @@ moved:
   # Advancing the watermark before the fact load has used the staged lines
   # lost them if the fact load failed; the procedure now advances it in the
   # same transaction as the load (ADR-0003).
-  Stage_Orders/Set watermark: etl.usp_load_fact_sales
+  # Only once Load_FactSales is rewritten: while it is lifted, the SSIS fact
+  # load does not move the watermark, so Stage_Orders must keep doing it.
+  Stage_Orders/Set watermark:
+    into: etl.usp_load_fact_sales
+    package: Load_FactSales

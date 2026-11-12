@@ -189,7 +189,29 @@ def test_dimension_load_time_is_passed_in_eastern_time(results):
     (sp,) = (a for a in results["Load_DimCustomer"].pipeline["properties"]["activities"] if a["name"] == "SCD customer")
     p = sp["typeProperties"]["storedProcedureParameters"]["load_ts"]
     assert p["type"] == "DateTime"
-    assert "convertFromUtc(pipeline().TriggerTime, 'Eastern Standard Time')" in p["value"]["value"]
+    assert p["value"]["value"].startswith("@convertFromUtc(if(empty(pipeline().parameters.run_time)")
+    assert p["value"]["value"].endswith("'Eastern Standard Time')")
+
+
+def test_master_passes_one_run_time_to_every_child(results):
+    calls = [
+        a for a in results["Master_Nightly"].pipeline["properties"]["activities"] if a["type"] == "ExecutePipeline"
+    ]
+    assert all("run_time" in a["typeProperties"]["parameters"] for a in calls)
+    for r in results.values():
+        assert "run_time" in r.pipeline["properties"]["parameters"], r.package
+
+
+def test_watermark_stays_in_stage_orders_while_the_fact_load_is_lifted():
+    lifted = {r.package: r for r in convert_project(ESTATE, {"Load_FactSales"})}
+    names = [a["name"] for a in lifted["Stage_Orders"].pipeline["properties"]["activities"]]
+    assert "If Set watermark" in names
+    assert not any("moved to" in m for m in lifted["Stage_Orders"].manual)
+
+
+def test_unread_variables_are_dropped(results):
+    assert "RowsCopied" not in results["Stage_Orders"].pipeline["properties"]["variables"]
+    assert "CurrentFile" not in results["Import_DealerTargets"].pipeline["properties"]["variables"]
 
 
 def test_flat_file_name_column_is_kept(results):

@@ -107,15 +107,17 @@
         }
       }
     ],
-    "parameters": {},
+    "parameters": {
+      "run_time": {
+        "type": "string",
+        "defaultValue": ""
+      }
+    },
     "variables": {
       "LastWatermark": {
         "type": "String"
       },
       "SourceQuery": {
-        "type": "String"
-      },
-      "RowsCopied": {
         "type": "String"
       }
     },

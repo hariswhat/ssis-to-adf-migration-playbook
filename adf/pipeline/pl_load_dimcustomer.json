@@ -17,7 +17,7 @@
           "storedProcedureParameters": {
             "load_ts": {
               "value": {
-                "value": "@convertFromUtc(pipeline().TriggerTime, 'Eastern Standard Time')",
+                "value": "@convertFromUtc(if(empty(pipeline().parameters.run_time), string(pipeline().TriggerTime), pipeline().parameters.run_time), 'Eastern Standard Time')",
                 "type": "Expression"
               },
               "type": "DateTime"
@@ -65,7 +65,12 @@
         }
       }
     ],
-    "parameters": {},
+    "parameters": {
+      "run_time": {
+        "type": "string",
+        "defaultValue": ""
+      }
+    },
     "variables": {},
     "annotations": [
       "converted-from-ssis"

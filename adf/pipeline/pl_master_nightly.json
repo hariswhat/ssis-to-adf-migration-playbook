@@ -12,7 +12,13 @@
             "referenceName": "pl_stage_customers",
             "type": "PipelineReference"
           },
-          "waitOnCompletion": true
+          "waitOnCompletion": true,
+          "parameters": {
+            "run_time": {
+              "value": "@if(empty(pipeline().parameters.run_time), string(pipeline().TriggerTime), pipeline().parameters.run_time)",
+              "type": "Expression"
+            }
+          }
         }
       },
       {
@@ -24,7 +30,13 @@
             "referenceName": "pl_stage_orders",
             "type": "PipelineReference"
           },
-          "waitOnCompletion": true
+          "waitOnCompletion": true,
+          "parameters": {
+            "run_time": {
+              "value": "@if(empty(pipeline().parameters.run_time), string(pipeline().TriggerTime), pipeline().parameters.run_time)",
+              "type": "Expression"
+            }
+          }
         }
       },
       {
@@ -43,7 +55,13 @@
             "referenceName": "pl_load_dimcustomer",
             "type": "PipelineReference"
           },
-          "waitOnCompletion": true
+          "waitOnCompletion": true,
+          "parameters": {
+            "run_time": {
+              "value": "@if(empty(pipeline().parameters.run_time), string(pipeline().TriggerTime), pipeline().parameters.run_time)",
+              "type": "Expression"
+            }
+          }
         }
       },
       {
@@ -68,7 +86,13 @@
             "referenceName": "pl_load_factsales",
             "type": "PipelineReference"
           },
-          "waitOnCompletion": true
+          "waitOnCompletion": true,
+          "parameters": {
+            "run_time": {
+              "value": "@if(empty(pipeline().parameters.run_time), string(pipeline().TriggerTime), pipeline().parameters.run_time)",
+              "type": "Expression"
+            }
+          }
         }
       },
       {
@@ -80,7 +104,13 @@
             "referenceName": "pl_import_dealertargets",
             "type": "PipelineReference"
           },
-          "waitOnCompletion": true
+          "waitOnCompletion": true,
+          "parameters": {
+            "run_time": {
+              "value": "@if(empty(pipeline().parameters.run_time), string(pipeline().TriggerTime), pipeline().parameters.run_time)",
+              "type": "Expression"
+            }
+          }
         }
       },
       {
@@ -99,7 +129,13 @@
             "referenceName": "pl_export_plantextract",
             "type": "PipelineReference"
           },
-          "waitOnCompletion": true
+          "waitOnCompletion": true,
+          "parameters": {
+            "run_time": {
+              "value": "@if(empty(pipeline().parameters.run_time), string(pipeline().TriggerTime), pipeline().parameters.run_time)",
+              "type": "Expression"
+            }
+          }
         }
       },
       {
@@ -337,7 +373,12 @@
         }
       }
     ],
-    "parameters": {},
+    "parameters": {
+      "run_time": {
+        "type": "string",
+        "defaultValue": ""
+      }
+    },
     "variables": {},
     "annotations": [
       "converted-from-ssis"

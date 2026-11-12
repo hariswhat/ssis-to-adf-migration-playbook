@@ -123,9 +123,18 @@ def _sql_source(conn: str | None) -> str:
     return "SqlServerSource" if conn == "ERP" else "AzureSqlSource"
 
 
+RUN_TIME = {"run_time": {"type": "string", "defaultValue": ""}}
+# One time per night for every pipeline the master calls: the master's own
+# trigger time, passed down. A child run on its own falls back to its own.
+RUN_TIME_EXPR = (
+    "@if(empty(pipeline().parameters.run_time), string(pipeline().TriggerTime), pipeline().parameters.run_time)"
+)
+
+
 class Converter:
-    def __init__(self, pkg: Package):
+    def __init__(self, pkg: Package, lifted: set[str] | frozenset[str] = frozenset()):
         self.pkg = pkg
+        self.lifted = lifted
         self.manual: list[str] = []
         self.variables: dict[str, dict] = {}
         self.row_counts: dict[str, str] = {}
@@ -383,6 +392,7 @@ class Converter:
                     "typeProperties": {
                         "pipeline": {"referenceName": pipeline_name(child), "type": "PipelineReference"},
                         "waitOnCompletion": True,
+                        "parameters": {"run_time": {"value": RUN_TIME_EXPR, "type": "Expression"}},
                     },
                 }
             ]
@@ -419,8 +429,11 @@ class Converter:
         moved = PATTERNS.get("moved", {})
         by_task: dict[str, list[dict]] = {}
         for t in top:
-            if f"{self.pkg.name}/{t.name}" in moved:
-                self.manual.append(f"{t.name}: moved to {moved[f'{self.pkg.name}/{t.name}']}")
+            m = moved.get(f"{self.pkg.name}/{t.name}")
+            # Only once the package that takes the work over is rewritten:
+            # while it is still lifted it does not do the work.
+            if m and m["package"] not in self.lifted:
+                self.manual.append(f"{t.name}: moved to {m['into']}")
                 by_task[t.name] = []
             else:
                 by_task[t.name] = self.task(t)
@@ -517,8 +530,15 @@ class Converter:
                     }
                 )
         params = {}
+        # SSIS variables nothing reads any more (a Row Count whose constraint
+        # went with a moved task, a loop variable replaced by item()) are dropped.
+        text = json.dumps(activities)
+        self.variables = {
+            n: v for n, v in self.variables.items() if f"variables('{n}')" in text or f'"variableName": "{n}"' in text
+        }
+        params = dict(RUN_TIME)
         if any(a["type"] == "GetMetadata" for a in activities):
-            params = {
+            params |= {
                 "inbound_folder": {"type": "string", "defaultValue": "inbound"},
                 "archive_folder": {"type": "string", "defaultValue": "archive"},
             }
@@ -572,6 +592,7 @@ def lift(pkg: Package) -> tuple[dict, list[str]]:
                     },
                 }
             ],
+            "parameters": dict(RUN_TIME),  # passed by the master; unused here
             "annotations": ["azure-ssis-ir"],
         },
     }, manual
@@ -590,7 +611,7 @@ def convert_project(folder: Path, lift_also: set[str] | frozenset[str] = frozens
             why = [f"blocked: {i.where}" for i in a.blockers] or ["lifted until its wave cuts over"]
             out.append(Result(pkg.name, pipeline, why + manual))
             continue
-        c = Converter(pkg)
+        c = Converter(pkg, frozenset(lift_also))
         out.append(Result(pkg.name, c.convert(), c.manual))
     return out
 

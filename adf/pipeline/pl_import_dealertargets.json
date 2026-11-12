@@ -213,6 +213,10 @@
       }
     ],
     "parameters": {
+      "run_time": {
+        "type": "string",
+        "defaultValue": ""
+      },
       "inbound_folder": {
         "type": "string",
         "defaultValue": "inbound"
@@ -222,11 +226,7 @@
         "defaultValue": "archive"
       }
     },
-    "variables": {
-      "CurrentFile": {
-        "type": "String"
-      }
-    },
+    "variables": {},
     "annotations": [
       "converted-from-ssis"
     ]

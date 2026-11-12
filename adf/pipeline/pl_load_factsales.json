@@ -56,7 +56,12 @@
         }
       }
     ],
-    "parameters": {},
+    "parameters": {
+      "run_time": {
+        "type": "string",
+        "defaultValue": ""
+      }
+    },
     "variables": {},
     "annotations": [
       "converted-from-ssis"
