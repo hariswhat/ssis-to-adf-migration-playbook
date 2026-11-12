@@ -55,3 +55,14 @@ Known gaps, in rough priority order.
     fixed-width file. A rewrite would be a Copy activity to a DelimitedText
     or a small Function, and SFTP instead of FTP (ADF's FTP connector cannot
     be used as a sink).
+14. **A trailing-space-only attribute change is lost.** The SCD component
+    saw 'West' and 'West ' as different; the procedure's `=` does not, so
+    the rewrite skips that change (ADR-0004). Plant one in the sample data
+    and decide whether to accept it or compare `DATALENGTH` as well.
+15. **Lifted dimension loads stamp UTC.** Until wave 2 cuts over, the lifted
+    Load_DimCustomer runs `GETDATE()` on Azure SQL, which returns UTC, while
+    history before and after uses Eastern time. Either convert those rows
+    after cutover, or cut wave 2 over soon after the move to ADF.
+16. **Alerts arrive twice.** A child pipeline alerts and fails, and the
+    master's Execute Pipeline activity then alerts as well. Both converted
+    OnError handlers are kept; collapse them into one if on-call prefers.

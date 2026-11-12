@@ -2,6 +2,23 @@
 
 Changes to this repository, newest first. Dates are commit dates.
 
+## 2026-11-12 (second review)
+
+- The watermark move into the fact procedure applied even while
+  Load_FactSales was lifted, so between waves 1 and 3 nothing moved it and
+  the SSIS fact load appended the same lines every night. A moved task is
+  now left out only once the package taking it over is rewritten.
+- One run time per night: the master passes its trigger time to every
+  child as `run_time`, which the dimension procedure uses as its load time.
+- The application lock in the dimension procedure has a timeout and its
+  result is checked.
+- Variables nothing reads are dropped from the converted pipelines; the
+  trigger run is counted in the cost.
+- Docs: the parallel factory needs its own dealer file folder, no plant
+  extract and its own Azure-SSIS IR; the grants lifted packages need; lifted
+  dimension loads stamp UTC; a trailing-space-only change is lost; failures
+  alert twice (open issues 14 to 16).
+
 ## 2026-11-11 (review fixes)
 
 A review of the factory, the procedures and the reconciliation found these;

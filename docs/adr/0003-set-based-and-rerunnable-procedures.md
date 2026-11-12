@@ -24,10 +24,14 @@ give the same result if it runs twice.
   case-sensitively and NULL-safely, as the component did. A second run finds
   nothing changed and does nothing. An application lock serialises runs,
   because new keys are `MAX + ROW_NUMBER`.
-- **Load time.** The pipeline passes `@load_ts` as the trigger time in
-  Eastern time, the clock SSIS's `GETDATE()` used on the on-premises server,
-  so new history stays on the same clock as the old, and every row a run
-  writes carries one time.
+- **Load time.** The pipeline passes `@load_ts` in Eastern time, the clock
+  SSIS's `GETDATE()` used on the on-premises server, so new history stays on
+  the same clock as the old. The value is the master pipeline's trigger
+  time, passed to every child as `run_time`, so every row a night writes
+  carries one time (a child run by hand uses its own). While the package is
+  still lifted, its `GETDATE()` runs on Azure SQL and stamps UTC; those
+  versions sit four to five hours later than their neighbours (open issue
+  15).
 - **Facts.** `etl.usp_load_fact_sales` reduces staging to the latest row
   per order line, deletes the fact and reject rows for those lines, then
   inserts them. A rerun, or an order line the ERP modified after it was

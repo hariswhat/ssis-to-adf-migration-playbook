@@ -46,7 +46,8 @@ flowchart LR
     patterns --> convert
     convert --> adf["adf/<br/>factory JSON"]
     adf --> cost["playbook.cost<br/>activity runs"]
-    procs["sql/procedures"] --> recon["playbook.reconcile"]
+    procs["sql/procedures"] -. "copied to" .-> ref["sql/reference<br/>DuckDB copies"]
+    ref --> recon["playbook.reconcile"]
     legacy["playbook.legacy<br/>SSIS behaviour"] --> recon
     accepted["reconciliation/<br/>accepted.yml"] --> recon
 ```

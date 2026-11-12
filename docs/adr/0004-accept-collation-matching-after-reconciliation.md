@@ -21,8 +21,10 @@ customer.
 
 Attribute changes are a separate case: the SCD component compares them in
 .NET, case-sensitively, and the procedure does the same with a binary
-collation. Neither detects a change in trailing spaces alone, because SQL
-Server's = ignores them under every collation.
+collation. One difference remains: .NET sees a change in trailing spaces
+alone ('West' to 'West '), and the procedure does not, because SQL Server's =
+ignores them under every collation. The sample data does not plant it, so
+reconciliation has not been shown to catch it (open issue 14).
 
 Two choices:
 

@@ -67,7 +67,7 @@ What is converted, and how:
 | SSIS | ADF |
 |---|---|
 | Execute SQL Task | Script activity; Stored Procedure activity for `EXEC`; Lookup activity when the result sets a variable; the Copy's pre-copy script when it only truncates the table that Copy loads |
-| Data flow, copy-shaped (source, row count, destination) | Copy activity; `rowsCopied` replaces the Row Count variable |
+| Data flow, copy-shaped (source, row count, destination) | Copy activity; an expression that read the Row Count variable reads the Copy's `rowsCopied` instead, and variables nothing reads are dropped |
 | Data flow that transforms | Stored Procedure activity calling the set-based rewrite in `sql/procedures` |
 | ForEach file loop | Get Metadata, Filter, ForEach |
 | File System Task (move) | Copy then Delete |
@@ -113,7 +113,8 @@ procedure was changed to match (ADR-0003).
 
 `python -m playbook.cost --files 1` counts what a nightly run is billed
 for: 16 activity runs on the Azure IR and 6 on the self-hosted IR, plus 3
-more on the self-hosted IR for each additional dealer file. The larger cost is
+more on the self-hosted IR for each additional dealer file, and the trigger
+run, which is billed with orchestration too. The larger cost is
 the Azure-SSIS IR's node hours and SSISDB while any package is lifted. Prices
 are inputs, not stored; [docs/cost-estimate.md](docs/cost-estimate.md) has
 the formula.
@@ -139,7 +140,7 @@ Also: [context](docs/architecture/c4-context.md) and
 
 ```bash
 make setup       # Python 3.11+, pinned requirements, pre-commit hooks
-make test        # 63 tests, about 2 s
+make test        # 66 tests, about 2 s
 make assess      # table above, plus assessment.csv with one row per item
 make waves
 make convert     # regenerate adf/

@@ -34,9 +34,15 @@ Commands run from the repository root unless stated otherwise.
    self-hosted IR as its data proxy (this needs an Azure Blob staging linked
    service), or join it to a VNet with a route to the network. The FTP
    connection of Export_PlantExtract needs the VNet route.
-8. Grant the factory's managed identity, as the IR's identity, the same
-   warehouse permissions as in step 3 for the lifted packages, which connect
-   with `ConnectUsingManagedIdentity`.
+8. The lifted packages connect as the factory's managed identity
+   (`ConnectUsingManagedIdentity`) and run their own SQL, so for as long as
+   any of them is lifted the identity also needs:
+   - SELECT, INSERT, UPDATE on `dw.dim_customer` (Load_DimCustomer);
+   - SELECT on `dw.dim_product`, INSERT on `dw.fact_sales` and
+     `etl.sales_rejected` (Load_FactSales);
+   - UPDATE on `etl.watermark` (Stage_Orders while Load_FactSales is lifted);
+   - DELETE on `etl.sales_rejected` if Maintenance_Purge runs.
+   Revoke each grant when the last package that needs it is rewritten.
 
 ## 2. Parallel run for a wave
 
@@ -48,9 +54,18 @@ See ADR-0005 for why it is set up this way.
    (Export_PlantExtract is lifted anyway; Master_Nightly is never lifted,
    because `pl_master_nightly` is the orchestrator from the first night.)
    Point its warehouse linked service and the lifted packages' DW override at
-   `NorthgateDW_parallel` (open issue 6) and deploy it to a second factory.
-2. Each night at 01:00, copy the warehouse to `NorthgateDW_parallel`, then
-   let both factories run.
+   `NorthgateDW_parallel` (open issue 6). Before deploying it to a second
+   factory:
+   - delete the "Run Export_PlantExtract" activity (and its alert and Fail
+     activities) from its `pl_master_nightly`, so the partner gets one file;
+   - set `pl_import_dealertargets`'s `inbound_folder` and `archive_folder`
+     defaults to a parallel copy, for example `parallel/inbound` and
+     `parallel/archive`;
+   - give it its own Azure-SSIS IR and SSISDB, and share the production
+     self-hosted IR with it as a linked IR.
+2. Each night at 01:00, copy the warehouse to `NorthgateDW_parallel` and
+   copy the night's dealer files to `parallel/inbound`, then let both
+   factories run.
 3. Compare each table the wave writes, by key, with the comparison in
    `playbook.reconcile`. Record the result per night.
 4. Record run times from ADF monitoring next to the times of the lifted
@@ -112,7 +127,10 @@ job.
 ## 7. A night fails after cutover
 
 1. The alert names the pipeline and activity, and the pipeline run fails
-   after the alert. Open the run in ADF monitoring.
+   after the alert. A failure in a child pipeline alerts twice, once from
+   the child and once from the master's Execute Pipeline activity (open
+   issue 16); the child's alert names the activity. Open the run in ADF
+   monitoring.
 2. Copy from ERP or the file share fails: check the self-hosted IR node is
    online and the Key Vault secret has not expired. Rerun from the failed
    activity; the Copy's pre-copy script truncates staging again.

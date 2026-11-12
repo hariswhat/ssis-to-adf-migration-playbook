@@ -18,8 +18,10 @@ accepted:
     tables: [dim_customer]
     adr: docs/adr/0005
     reason: >
-      In a parallel run SSIS stamps new versions with GETDATE() and the
-      pipeline with its trigger time, so the same version's valid_from (and
-      the expired version's valid_to) differ by minutes. Accepted when the two
-      stamps are less than six hours apart; versions are matched by their
-      position in the customer's history, not by timestamp.
+      In a parallel run the lifted SSIS package stamps new versions with
+      GETDATE(), which on Azure SQL is UTC, and the rewrite with the night's
+      run time in Eastern time, so the same version's valid_from (and the
+      expired version's valid_to) differ by four to five hours plus the gap
+      between the runs. Accepted when the two stamps are less than six hours
+      apart; versions are matched by their position in the customer's
+      history, not by timestamp.

@@ -11,7 +11,7 @@ record that date next to the result.
 
 | Meter | Unit | Quantity for this estate | Source |
 |---|---|---|---|
-| Orchestration, Azure IR | per 1,000 activity runs | 16 per night | `python -m playbook.cost --files 1` |
+| Orchestration, Azure IR | per 1,000 runs | 16 activity runs and 1 trigger run per night | `python -m playbook.cost --files 1` |
 | Orchestration, self-hosted IR | per 1,000 activity runs | 6 per night with one dealer file, plus 3 per extra file | same |
 | Data movement, Azure IR | DIU-hours | none: every copy in this factory touches the ERP or the file share, so all of them run on the self-hosted IR | same |
 | Data movement, self-hosted IR | hours of copy execution | 4 copies per night; duration measured in the parallel run | ADF monitoring |
@@ -23,15 +23,15 @@ record that date next to the result.
 
 The counts are for the converted factory as committed in `adf/` (only
 Export_PlantExtract lifted), on a night where everything succeeds and every
-If Condition is true. Failure alerts and the Fail activities after them
-do not run on a good night and are not counted. `Maintenance_Purge` is not counted, because nothing calls it
-(ADR-0001).
+If Condition is true. Failure alerts and the Fail activities after them do
+not run on a good night and are not counted. `Maintenance_Purge` is not
+counted, because nothing calls it (ADR-0001).
 
 ## Formula
 
 ```
 monthly =
-    nights × (azure_runs × price_azure_run + shir_runs × price_shir_run) / 1000
+    nights × ((azure_runs + 1 trigger run) × price_azure_run + shir_runs × price_shir_run) / 1000
   + nights × shir_copy_hours × price_shir_movement_hour
   + nights × activity_hours × price_activity_hour
   + nights × ssis_ir_hours × nodes × price_ssis_node_hour
@@ -48,7 +48,7 @@ python -m playbook.cost --files 1 --nights 30 \
 
 ## What dominates
 
-The run counts are small: 22 activity runs a night is 660 in 30 nights.
+The run counts are small: 23 runs a night (22 activity runs and the trigger) is 690 in 30 nights.
 While any package is lifted, the cost is the Azure-SSIS IR's node hours and
 the SSISDB database, and both are fixed costs per night whether the packages
 take one minute or fifty. During the migration every package not yet cut

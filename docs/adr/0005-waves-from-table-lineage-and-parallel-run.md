@@ -53,7 +53,15 @@ nothing still depends on SSIS scheduling.
    still lifted, and every warehouse connection (the linked service and the
    lifted packages' override) points at the copy. Staging, watermarks and
    procedures are separate because the database is separate; the procedures
-   need no changes.
+   need no changes. Three things outside the database are not, and are
+   separated by hand:
+   - the dealer files: the parallel factory reads a copy of each night's
+     files in its own inbound folder, because whichever factory runs first
+     archives them;
+   - the plant extract: Export_PlantExtract is left out of the parallel
+     factory's master pipeline, so the partner receives one file a night;
+   - the Azure-SSIS IR and SSISDB: the parallel factory has its own, and
+     shares the self-hosted IR with production as a linked IR.
 4. `playbook.reconcile` compares the tables the wave writes between the two
    databases.
 
