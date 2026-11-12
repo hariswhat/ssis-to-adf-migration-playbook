@@ -14,6 +14,7 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+pythonpath = ["."]
 
 [tool.ruff.lint.per-file-ignores]
 # The sample estate writes .dtsx XML and SQL literals that read better unwrapped.

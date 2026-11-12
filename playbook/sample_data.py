@@ -41,9 +41,18 @@ def generate(seed: int = 11, customers: int = 400, lines: int = 12_000) -> dict[
             end = start + timedelta(days=rng.randint(120, 400)) if v < versions - 1 else datetime(9999, 12, 31)
             if v > 0:
                 region, tier = rng.choice(REGIONS), rng.choice(TIERS)
-            dim_rows.append({"customer_key": key, "customer_code": code, "customer_name": name,
-                             "region": region, "tier": tier, "valid_from": start, "valid_to": end,
-                             "is_current": int(v == versions - 1)})
+            dim_rows.append(
+                {
+                    "customer_key": key,
+                    "customer_code": code,
+                    "customer_name": name,
+                    "region": region,
+                    "tier": tier,
+                    "valid_from": start,
+                    "valid_to": end,
+                    "is_current": int(v == versions - 1),
+                }
+            )
             start = end
         current[code] = (name, region, tier)
     dim_before = pd.DataFrame(dim_rows)
@@ -52,17 +61,30 @@ def generate(seed: int = 11, customers: int = 400, lines: int = 12_000) -> dict[
     for code, (name, region, tier) in current.items():
         r = rng.random()
         if r < 0.05:
-            name = name + " LLC"                     # type 1 change
+            name = name + " LLC"  # type 1 change
         elif r < 0.09:
             region = rng.choice([x for x in REGIONS if x != region])  # type 2 change
         elif r < 0.11:
             tier = rng.choice([x for x in TIERS if x != tier])
-        stg_rows.append({"customer_code": code, "customer_name": name, "region": region,
-                         "tier": tier, "modified_at": LOAD_TS - timedelta(hours=3)})
+        stg_rows.append(
+            {
+                "customer_code": code,
+                "customer_name": name,
+                "region": region,
+                "tier": tier,
+                "modified_at": LOAD_TS - timedelta(hours=3),
+            }
+        )
     for i in range(customers + 1, customers + 11):  # new customers
-        stg_rows.append({"customer_code": f"C{i:05d}", "customer_name": f"Dealer {i:05d}",
-                         "region": rng.choice(REGIONS), "tier": "Bronze",
-                         "modified_at": LOAD_TS - timedelta(hours=2)})
+        stg_rows.append(
+            {
+                "customer_code": f"C{i:05d}",
+                "customer_name": f"Dealer {i:05d}",
+                "region": rng.choice(REGIONS),
+                "tier": "Bronze",
+                "modified_at": LOAD_TS - timedelta(hours=2),
+            }
+        )
     stg_customer = pd.DataFrame(stg_rows)
 
     dim_product = pd.DataFrame([{"product_key": k, "product_code": f"P{k:04d}"} for k in range(1, 201)])
@@ -73,18 +95,29 @@ def generate(seed: int = 11, customers: int = 400, lines: int = 12_000) -> dict[
         code = rng.choice(codes)
         r = rng.random()
         if r < 0.015:
-            code = code.lower()                       # 'c00042'
+            code = code.lower()  # 'c00042'
         elif r < 0.025:
-            code = code + " "                         # trailing space from a CHAR column
+            code = code + " "  # trailing space from a CHAR column
         qty = rng.randint(1, 40) if rng.random() > 0.01 else rng.choice([0, -1, -3])
-        ol.append({"order_id": 500_000 + n // 3, "line_number": n % 3 + 1, "customer_code": code,
-                   "product_code": f"P{rng.randint(1, 205):04d}",  # a few unknown products
-                   "order_date": date(2026, 3, 1), "quantity": qty,
-                   "unit_price": round(rng.uniform(5, 400), 2),
-                   "modified_at": LOAD_TS - timedelta(minutes=rng.randint(10, 600))})
+        ol.append(
+            {
+                "order_id": 500_000 + n // 3,
+                "line_number": n % 3 + 1,
+                "customer_code": code,
+                "product_code": f"P{rng.randint(1, 205):04d}",  # a few unknown products
+                "order_date": date(2026, 3, 1),
+                "quantity": qty,
+                "unit_price": round(rng.uniform(5, 400), 2),
+                "modified_at": LOAD_TS - timedelta(minutes=rng.randint(10, 600)),
+            }
+        )
     stg_order_line = pd.DataFrame(ol)
-    return {"dim_customer_before": dim_before, "stg_customer": stg_customer,
-            "dim_product": dim_product, "stg_order_line": stg_order_line}
+    return {
+        "dim_customer_before": dim_before,
+        "stg_customer": stg_customer,
+        "dim_product": dim_product,
+        "stg_order_line": stg_order_line,
+    }
 
 
 def write(out: Path, seed: int = 11) -> dict[str, int]:

@@ -37,12 +37,12 @@ REFERENCE = ROOT / "sql" / "reference"
 
 TABLES = {
     # table: (natural key, compared columns)
-    "dim_customer": (["customer_code", "valid_from"],
-                     ["customer_name", "region", "tier", "valid_to", "is_current"]),
-    "fact_sales": (["order_id", "line_number"],
-                   ["customer", "product_key", "quantity", "unit_price", "net_amount"]),
-    "sales_rejected": (["order_id", "line_number"],
-                       ["customer", "product_key", "quantity", "unit_price", "net_amount"]),
+    "dim_customer": (["customer_code", "valid_from"], ["customer_name", "region", "tier", "valid_to", "is_current"]),
+    "fact_sales": (["order_id", "line_number"], ["customer", "product_key", "quantity", "unit_price", "net_amount"]),
+    "sales_rejected": (
+        ["order_id", "line_number"],
+        ["customer", "product_key", "quantity", "unit_price", "net_amount"],
+    ),
 }
 
 
@@ -59,6 +59,7 @@ class Difference:
 
 
 # ---------------------------------------------------------------- run both sides
+
 
 def run_legacy(data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     dim = legacy.scd(data["dim_customer_before"], data["stg_customer"], sample_data.LOAD_TS)
@@ -86,10 +87,12 @@ def _statements(sql: str) -> list[str]:
 
 # ---------------------------------------------------------------- compare
 
+
 def _with_customer(fact: pd.DataFrame, dim: pd.DataFrame) -> pd.DataFrame:
     """Replace customer_key by the dimension row it points at."""
-    ident = {k: f"{c}@{_ts(v)}" for k, c, v in
-             zip(dim["customer_key"], dim["customer_code"], dim["valid_from"], strict=True)}
+    ident = {
+        k: f"{c}@{_ts(v)}" for k, c, v in zip(dim["customer_key"], dim["customer_code"], dim["valid_from"], strict=True)
+    }
     out = fact.copy()
     out["customer"] = [ident.get(k, "unknown") if k != -1 else "unknown" for k in out["customer_key"]]
     return out
@@ -142,22 +145,28 @@ def compare_table(name: str, old: pd.DataFrame, new: pd.DataFrame) -> list[Diffe
 def compare(old: dict[str, pd.DataFrame], new: dict[str, pd.DataFrame]) -> list[Difference]:
     diffs = compare_table("dim_customer", old["dim_customer"], new["dim_customer"])
     for t in ("fact_sales", "sales_rejected"):
-        diffs += compare_table(t, _with_customer(old[t], old["dim_customer"]),
-                               _with_customer(new[t], new["dim_customer"]))
+        diffs += compare_table(
+            t, _with_customer(old[t], old["dim_customer"]), _with_customer(new[t], new["dim_customer"])
+        )
     return diffs
 
 
 # ---------------------------------------------------------------- accepted differences
+
 
 def _code_not_canonical(d: Difference) -> bool:
     """The order line's code differs from the dimension's only by case or
     trailing spaces: SSIS's Lookup missed it, the SQL join under a
     case-insensitive collation found it."""
     code = str(d.row.get("customer_code", ""))
-    return (d.kind == "column" and d.column == "customer"
-            and d.legacy == "unknown" and d.new != "unknown"
-            and code != code.rstrip().upper()
-            and str(d.new).startswith(code.rstrip().upper() + "@"))
+    return (
+        d.kind == "column"
+        and d.column == "customer"
+        and d.legacy == "unknown"
+        and d.new != "unknown"
+        and code != code.rstrip().upper()
+        and str(d.new).startswith(code.rstrip().upper() + "@")
+    )
 
 
 MATCHERS = {"code_case_or_trailing_space": _code_not_canonical}
@@ -181,15 +190,21 @@ def classify(diffs: list[Difference], rules: list[dict]) -> None:
 
 # ---------------------------------------------------------------- report
 
-def report(old: dict[str, pd.DataFrame], new: dict[str, pd.DataFrame],
-           diffs: list[Difference], rules: list[dict]) -> str:
-    out = ["| Table | Legacy rows | New rows | Only legacy | Only new | Column differences | Accepted |",
-           "|---|---:|---:|---:|---:|---:|---:|"]
+
+def report(
+    old: dict[str, pd.DataFrame], new: dict[str, pd.DataFrame], diffs: list[Difference], rules: list[dict]
+) -> str:
+    out = [
+        "| Table | Legacy rows | New rows | Only legacy | Only new | Column differences | Accepted |",
+        "|---|---:|---:|---:|---:|---:|---:|",
+    ]
     for t in TABLES:
         mine = [d for d in diffs if d.table == t]
-        out.append(f"| {t} | {len(old[t]):,} | {len(new[t]):,} | "
-                   f"{sum(d.kind == 'only_legacy' for d in mine):,} | {sum(d.kind == 'only_new' for d in mine):,} | "
-                   f"{sum(d.kind == 'column' for d in mine):,} | {sum(d.accepted_by is not None for d in mine):,} |")
+        out.append(
+            f"| {t} | {len(old[t]):,} | {len(new[t]):,} | "
+            f"{sum(d.kind == 'only_legacy' for d in mine):,} | {sum(d.kind == 'only_new' for d in mine):,} | "
+            f"{sum(d.kind == 'column' for d in mine):,} | {sum(d.accepted_by is not None for d in mine):,} |"
+        )
     for r in rules:
         n = sum(d.accepted_by == r["id"] for d in diffs)
         out.append(f"\nAccepted, {r['id']} ({r['adr']}): {n:,}")

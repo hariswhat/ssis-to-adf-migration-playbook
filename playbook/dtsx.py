@@ -157,18 +157,25 @@ def parse(path: Path) -> Package:
     for cm in root.findall(f"{{{DTS}}}ConnectionManagers/{{{DTS}}}ConnectionManager"):
         inner = cm.find(f"{{{DTS}}}ObjectData/{{{DTS}}}ConnectionManager")
         expr = cm.find(f"{{{DTS}}}PropertyExpression[@{{{DTS}}}Name='ConnectionString']")
-        conns.append(Connection(
-            name=_a(cm, "ObjectName"), kind=_a(cm, "CreationName"), dtsid=_a(cm, "DTSID"),
-            connection_string=_a(inner, "ConnectionString") if inner is not None else "",
-            expression=expr.text if expr is not None else None,
-        ))
+        conns.append(
+            Connection(
+                name=_a(cm, "ObjectName"),
+                kind=_a(cm, "CreationName"),
+                dtsid=_a(cm, "DTSID"),
+                connection_string=_a(inner, "ConnectionString") if inner is not None else "",
+                expression=expr.text if expr is not None else None,
+            )
+        )
     variables = []
     for v in root.findall(f"{{{DTS}}}Variables/{{{DTS}}}Variable"):
         val = v.find(f"{{{DTS}}}VariableValue")
-        variables.append(Variable(
-            _a(v, "ObjectName"), val.text or "" if val is not None else "",
-            _a(v, "Expression") if _a(v, "EvaluateAsExpression") == "True" else None,
-        ))
+        variables.append(
+            Variable(
+                _a(v, "ObjectName"),
+                val.text or "" if val is not None else "",
+                _a(v, "Expression") if _a(v, "EvaluateAsExpression") == "True" else None,
+            )
+        )
     tasks = [_task(e) for e in root.findall(f"{{{DTS}}}Executables/{{{DTS}}}Executable")]
     for eh in root.findall(f"{{{DTS}}}EventHandlers/{{{DTS}}}EventHandler"):
         event = _a(eh, "EventName")
@@ -176,10 +183,14 @@ def parse(path: Path) -> Package:
             tasks.append(_task(e, event))
     constraints = []
     for pc in root.findall(f"{{{DTS}}}PrecedenceConstraints/{{{DTS}}}PrecedenceConstraint"):
-        constraints.append(Constraint(
-            _a(pc, "From").rsplit("\\", 1)[-1], _a(pc, "To").rsplit("\\", 1)[-1],
-            int(_a(pc, "Value", "0")), _a(pc, "Expression") or None,
-        ))
+        constraints.append(
+            Constraint(
+                _a(pc, "From").rsplit("\\", 1)[-1],
+                _a(pc, "To").rsplit("\\", 1)[-1],
+                int(_a(pc, "Value", "0")),
+                _a(pc, "Expression") or None,
+            )
+        )
     return Package(_a(root, "ObjectName") or path.stem, path, conns, variables, tasks, constraints)
 
 

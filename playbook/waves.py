@@ -88,7 +88,8 @@ def plan(packages: list[Package]) -> tuple[list[list[str]], dict[str, Lineage]]:
     Orchestrator-only packages (only Execute Package tasks) go last."""
     lins = {p.name: lineage(p) for p in packages}
     orchestrators = {
-        p.name for p in packages
+        p.name
+        for p in packages
         if all(t.kind == "Microsoft.ExecutePackageTask" or t.in_event_handler for t in p.all_tasks())
     }
     workers = [n for n in lins if n not in orchestrators]

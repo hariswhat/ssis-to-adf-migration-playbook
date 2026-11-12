@@ -81,29 +81,75 @@ def assess_package(pkg: Package) -> Assessment:
     for t in pkg.all_tasks():
         r = _rule("tasks", t.kind)
         if t.in_event_handler:
-            a.items.append(Item(pkg.name, f"{t.in_event_handler} handler: {t.name}", t.kind,
-                                f"Failure path: {r['target']}", PATTERNS["expressions"]["event_handler"]))
+            a.items.append(
+                Item(
+                    pkg.name,
+                    f"{t.in_event_handler} handler: {t.name}",
+                    t.kind,
+                    f"Failure path: {r['target']}",
+                    PATTERNS["expressions"]["event_handler"],
+                )
+            )
             continue
-        a.items.append(Item(pkg.name, t.name, t.kind, r["target"], r["effort"],
-                            r.get("blocker", False), r.get("semantics"), r.get("note")))
+        a.items.append(
+            Item(
+                pkg.name,
+                t.name,
+                t.kind,
+                r["target"],
+                r["effort"],
+                r.get("blocker", False),
+                r.get("semantics"),
+                r.get("note"),
+            )
+        )
         for c in t.components:
             cr = _rule("components", c.class_id)
-            a.items.append(Item(pkg.name, f"{t.name} / {c.name}", c.class_id, cr["target"],
-                                cr["effort"], cr.get("blocker", False), cr.get("semantics"),
-                                cr.get("note")))
+            a.items.append(
+                Item(
+                    pkg.name,
+                    f"{t.name} / {c.name}",
+                    c.class_id,
+                    cr["target"],
+                    cr["effort"],
+                    cr.get("blocker", False),
+                    cr.get("semantics"),
+                    cr.get("note"),
+                )
+            )
     for c in pkg.connections:
         if c.expression:
-            a.items.append(Item(pkg.name, f"connection {c.name}", "PropertyExpression",
-                                "Linked service parameter", PATTERNS["expressions"]["connection"]))
+            a.items.append(
+                Item(
+                    pkg.name,
+                    f"connection {c.name}",
+                    "PropertyExpression",
+                    "Linked service parameter",
+                    PATTERNS["expressions"]["connection"],
+                )
+            )
     for v in pkg.variables:
         if v.expression:
-            a.items.append(Item(pkg.name, f"variable {v.name}", "Variable expression",
-                                "Pipeline expression (@concat, variables())",
-                                PATTERNS["expressions"]["variable"]))
+            a.items.append(
+                Item(
+                    pkg.name,
+                    f"variable {v.name}",
+                    "Variable expression",
+                    "Pipeline expression (@concat, variables())",
+                    PATTERNS["expressions"]["variable"],
+                )
+            )
     for pc in pkg.constraints:
         if pc.expression:
-            a.items.append(Item(pkg.name, f"{pc.source} -> {pc.target}", "Constraint expression",
-                                "If Condition activity", PATTERNS["expressions"]["constraint"]))
+            a.items.append(
+                Item(
+                    pkg.name,
+                    f"{pc.source} -> {pc.target}",
+                    "Constraint expression",
+                    "If Condition activity",
+                    PATTERNS["expressions"]["constraint"],
+                )
+            )
     return a
 
 
@@ -123,10 +169,7 @@ def scheduled_packages(jobs_file: Path) -> set[str]:
         return set()
     doc = yaml.safe_load(jobs_file.read_text()) or {}
     return {
-        Path(step["package"]).stem
-        for job in doc.get("jobs", [])
-        for step in job.get("steps", [])
-        if "package" in step
+        Path(step["package"]).stem for job in doc.get("jobs", []) for step in job.get("steps", []) if "package" in step
     }
 
 
@@ -144,8 +187,10 @@ def assess_project(folder: Path, jobs_file: Path | None = None) -> list[Assessme
 
 
 def markdown(assessments: list[Assessment]) -> str:
-    lines = ["| Package | Path | Complexity | Points | Blockers | Behaviour to reconcile |",
-             "|---|---|---|---|---|---|"]
+    lines = [
+        "| Package | Path | Complexity | Points | Blockers | Behaviour to reconcile |",
+        "|---|---|---|---|---|---|",
+    ]
     for a in assessments:
         sem = sorted({i.ssis.removeprefix("Microsoft.") for i in a.items if i.semantics})
         lines.append(
@@ -156,8 +201,10 @@ def markdown(assessments: list[Assessment]) -> str:
     by_path: dict[str, int] = {}
     for a in assessments:
         by_path[a.path] = by_path.get(a.path, 0) + 1
-    lines += ["", f"{len(assessments)} packages, {total} points. "
-              + "; ".join(f"{k}: {v}" for k, v in sorted(by_path.items()))]
+    lines += [
+        "",
+        f"{len(assessments)} packages, {total} points. " + "; ".join(f"{k}: {v}" for k, v in sorted(by_path.items())),
+    ]
     return "\n".join(lines)
 
 
@@ -167,8 +214,7 @@ def write_csv(assessments: list[Assessment], path: Path) -> None:
         w.writerow(["package", "where", "ssis", "target", "effort", "blocker", "semantics", "note"])
         for a in assessments:
             for i in a.items:
-                w.writerow([i.package, i.where, i.ssis, i.target, i.effort, i.blocker,
-                            i.semantics or "", i.note or ""])
+                w.writerow([i.package, i.where, i.ssis, i.target, i.effort, i.blocker, i.semantics or "", i.note or ""])
 
 
 def main() -> int:  # pragma: no cover

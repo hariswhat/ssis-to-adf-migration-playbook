@@ -33,10 +33,16 @@ def q(s: str) -> str:
 
 
 CONNECTIONS = {
-    "ERP": ("OLEDB", "Data Source=ERPSQL01;Initial Catalog=ERP;Provider=SQLNCLI11.1;Integrated Security=SSPI;",
-            "@[$Project::ERP_ConnectionString]"),
-    "DW": ("OLEDB", "Data Source=DWSQL01;Initial Catalog=NorthgateDW;Provider=SQLNCLI11.1;Integrated Security=SSPI;",
-           "@[$Project::DW_ConnectionString]"),
+    "ERP": (
+        "OLEDB",
+        "Data Source=ERPSQL01;Initial Catalog=ERP;Provider=SQLNCLI11.1;Integrated Security=SSPI;",
+        "@[$Project::ERP_ConnectionString]",
+    ),
+    "DW": (
+        "OLEDB",
+        "Data Source=DWSQL01;Initial Catalog=NorthgateDW;Provider=SQLNCLI11.1;Integrated Security=SSPI;",
+        "@[$Project::DW_ConnectionString]",
+    ),
     "DealerFile": ("FLATFILE", r"\\fileshare01\dealers\inbound\dealer_targets.csv", "@[User::CurrentFile]"),
     "SMTP": ("SMTP", "SmtpServer=smtp.northgate.example;UseWindowsAuthentication=True;", None),
     "PlantFTP": ("FTP", "ftp.plantpartner.example:21", None),
@@ -93,7 +99,8 @@ def sql_task(path: str, name: str, conn: str, sql: str, result_var: str | None =
     rs = ' SQLTask:ResultType="ResultSetType_SingleRow"' if result_var else ""
     binding = (
         f'\n          <SQLTask:ResultBinding SQLTask:ResultName="0" SQLTask:DtsVariableName="User::{result_var}" />'
-        if result_var else ""
+        if result_var
+        else ""
     )
     body = (
         f'        <SQLTask:SqlTaskData SQLTask:Connection="{gid("cm", conn)}" '
@@ -104,10 +111,11 @@ def sql_task(path: str, name: str, conn: str, sql: str, result_var: str | None =
     return task(path, name, "Microsoft.ExecuteSQLTask", body)
 
 
-def component(df: str, name: str, cls: str, props: dict[str, str], conn: str | None = None,
-              extra: str = "") -> str:
-    lines = [f'            <component refId="{df}\\{name}" componentClassID="{cls}" name="{q(name)}">',
-             "              <properties>"]
+def component(df: str, name: str, cls: str, props: dict[str, str], conn: str | None = None, extra: str = "") -> str:
+    lines = [
+        f'            <component refId="{df}\\{name}" componentClassID="{cls}" name="{q(name)}">',
+        "              <properties>",
+    ]
     for k, v in props.items():
         lines.append(f'                <property name="{k}">{q(v)}</property>')
     lines.append("              </properties>")
@@ -176,8 +184,15 @@ def on_error_mail(pkg: str) -> str:
     )
 
 
-def package(name: str, conns: list[str], body: str, vars_: list | None = None,
-            pcs: list | None = None, on_error: bool = False, var_expr: dict | None = None) -> str:
+def package(
+    name: str,
+    conns: list[str],
+    body: str,
+    vars_: list | None = None,
+    pcs: list | None = None,
+    on_error: bool = False,
+    var_expr: dict | None = None,
+) -> str:
     parts = [
         '<?xml version="1.0"?>',
         f'<DTS:Executable xmlns:DTS="www.microsoft.com/SqlServer/Dts" DTS:refId="Package" '
@@ -200,88 +215,281 @@ def build() -> dict[str, str]:
     P = "Package"
     pk: dict[str, str] = {}
 
-    pk["Stage_Customers"] = package("Stage_Customers", ["ERP", "DW"], "\n".join([
-        sql_task(P, "Truncate stage", "DW", "TRUNCATE TABLE stg.customer;"),
-        data_flow(P, "Copy customers", [
-            component(f"{P}\\Copy customers", "ERP customers", "Microsoft.OLEDBSource",
-                      {"AccessMode": "2", "SqlCommand": "SELECT customer_code, customer_name, region, tier, modified_at FROM dbo.customer"}, "ERP"),
-            component(f"{P}\\Copy customers", "stg customer", "Microsoft.OLEDBDestination",
-                      {"AccessMode": "3", "OpenRowset": "[stg].[customer]", "FastLoadOptions": "TABLOCK"}, "DW"),
-        ], [("ERP customers", "stg customer")]),
-    ]), pcs=[("Truncate stage", "Copy customers", 0, None)])
+    pk["Stage_Customers"] = package(
+        "Stage_Customers",
+        ["ERP", "DW"],
+        "\n".join(
+            [
+                sql_task(P, "Truncate stage", "DW", "TRUNCATE TABLE stg.customer;"),
+                data_flow(
+                    P,
+                    "Copy customers",
+                    [
+                        component(
+                            f"{P}\\Copy customers",
+                            "ERP customers",
+                            "Microsoft.OLEDBSource",
+                            {
+                                "AccessMode": "2",
+                                "SqlCommand": "SELECT customer_code, customer_name, region, tier, modified_at FROM dbo.customer",
+                            },
+                            "ERP",
+                        ),
+                        component(
+                            f"{P}\\Copy customers",
+                            "stg customer",
+                            "Microsoft.OLEDBDestination",
+                            {"AccessMode": "3", "OpenRowset": "[stg].[customer]", "FastLoadOptions": "TABLOCK"},
+                            "DW",
+                        ),
+                    ],
+                    [("ERP customers", "stg customer")],
+                ),
+            ]
+        ),
+        pcs=[("Truncate stage", "Copy customers", 0, None)],
+    )
 
-    pk["Stage_Orders"] = package("Stage_Orders", ["ERP", "DW"], "\n".join([
-        sql_task(P, "Get watermark", "DW",
-                 "SELECT CONVERT(VARCHAR(23), MAX(watermark_at), 121) AS last_watermark FROM etl.watermark WHERE table_name = 'order_line'",
-                 result_var="LastWatermark"),
-        data_flow(P, "Copy new order lines", [
-            component(f"{P}\\Copy new order lines", "ERP order lines", "Microsoft.OLEDBSource",
-                      {"AccessMode": "3", "SqlCommandVariable": "User::SourceQuery"}, "ERP"),
-            component(f"{P}\\Copy new order lines", "Count rows", "Microsoft.RowCount",
-                      {"VariableName": "User::RowsCopied"}),
-            component(f"{P}\\Copy new order lines", "stg order_line", "Microsoft.OLEDBDestination",
-                      {"AccessMode": "3", "OpenRowset": "[stg].[order_line]", "FastLoadOptions": "TABLOCK"}, "DW"),
-        ], [("ERP order lines", "Count rows"), ("Count rows", "stg order_line")]),
-        sql_task(P, "Set watermark", "DW",
-                 "UPDATE etl.watermark SET watermark_at = (SELECT MAX(modified_at) FROM stg.order_line) WHERE table_name = 'order_line';"),
-    ]), vars_=[("LastWatermark", 8, "1900-01-01"), ("SourceQuery", 8, ""), ("RowsCopied", 3, "0")],
-        var_expr={"SourceQuery": '"SELECT order_id, line_number, customer_code, product_code, order_date, quantity, unit_price, modified_at FROM dbo.order_line WHERE modified_at > \'" + @[User::LastWatermark] + "\'"'},
-        pcs=[("Get watermark", "Copy new order lines", 0, None),
-             ("Copy new order lines", "Set watermark", 0, "@[User::RowsCopied] > 0")])
+    pk["Stage_Orders"] = package(
+        "Stage_Orders",
+        ["ERP", "DW"],
+        "\n".join(
+            [
+                sql_task(
+                    P,
+                    "Get watermark",
+                    "DW",
+                    "SELECT CONVERT(VARCHAR(23), MAX(watermark_at), 121) AS last_watermark FROM etl.watermark WHERE table_name = 'order_line'",
+                    result_var="LastWatermark",
+                ),
+                data_flow(
+                    P,
+                    "Copy new order lines",
+                    [
+                        component(
+                            f"{P}\\Copy new order lines",
+                            "ERP order lines",
+                            "Microsoft.OLEDBSource",
+                            {"AccessMode": "3", "SqlCommandVariable": "User::SourceQuery"},
+                            "ERP",
+                        ),
+                        component(
+                            f"{P}\\Copy new order lines",
+                            "Count rows",
+                            "Microsoft.RowCount",
+                            {"VariableName": "User::RowsCopied"},
+                        ),
+                        component(
+                            f"{P}\\Copy new order lines",
+                            "stg order_line",
+                            "Microsoft.OLEDBDestination",
+                            {"AccessMode": "3", "OpenRowset": "[stg].[order_line]", "FastLoadOptions": "TABLOCK"},
+                            "DW",
+                        ),
+                    ],
+                    [("ERP order lines", "Count rows"), ("Count rows", "stg order_line")],
+                ),
+                sql_task(
+                    P,
+                    "Set watermark",
+                    "DW",
+                    "UPDATE etl.watermark SET watermark_at = (SELECT MAX(modified_at) FROM stg.order_line) WHERE table_name = 'order_line';",
+                ),
+            ]
+        ),
+        vars_=[("LastWatermark", 8, "1900-01-01"), ("SourceQuery", 8, ""), ("RowsCopied", 3, "0")],
+        var_expr={
+            "SourceQuery": '"SELECT order_id, line_number, customer_code, product_code, order_date, quantity, unit_price, modified_at FROM dbo.order_line WHERE modified_at > \'" + @[User::LastWatermark] + "\'"'
+        },
+        pcs=[
+            ("Get watermark", "Copy new order lines", 0, None),
+            ("Copy new order lines", "Set watermark", 0, "@[User::RowsCopied] > 0"),
+        ],
+    )
 
-    pk["Load_DimCustomer"] = package("Load_DimCustomer", ["DW"], data_flow(P, "SCD customer", [
-        component(f"{P}\\SCD customer", "stg customer", "Microsoft.OLEDBSource",
-                  {"AccessMode": "0", "OpenRowset": "[stg].[customer]"}, "DW"),
-        component(f"{P}\\SCD customer", "Slowly Changing Dimension", "Microsoft.SCD",
-                  {"SqlCommand": "SELECT customer_key, customer_code, customer_name, region, tier, valid_from, valid_to, is_current FROM dw.dim_customer",
-                   "CurrentRowWhere": "[is_current] = 1",
-                   "HistoricalAttributes": "region,tier", "ChangingAttributes": "customer_name",
-                   "BusinessKey": "customer_code", "IncomingRowChangeType": "1"}, "DW"),
-        component(f"{P}\\SCD customer", "Expire current row", "Microsoft.OLEDBCommand",
-                  {"SqlCommand": "UPDATE dw.dim_customer SET valid_to = GETDATE(), is_current = 0 WHERE customer_code = ? AND is_current = 1"}, "DW"),
-        component(f"{P}\\SCD customer", "Update changing attributes", "Microsoft.OLEDBCommand",
-                  {"SqlCommand": "UPDATE dw.dim_customer SET customer_name = ? WHERE customer_code = ?"}, "DW"),
-        component(f"{P}\\SCD customer", "Insert new versions", "Microsoft.OLEDBDestination",
-                  {"AccessMode": "3", "OpenRowset": "[dw].[dim_customer]"}, "DW"),
-    ], [("stg customer", "Slowly Changing Dimension"), ("Slowly Changing Dimension", "Expire current row"),
-        ("Slowly Changing Dimension", "Update changing attributes"), ("Expire current row", "Insert new versions")]),
-        on_error=True)
+    pk["Load_DimCustomer"] = package(
+        "Load_DimCustomer",
+        ["DW"],
+        data_flow(
+            P,
+            "SCD customer",
+            [
+                component(
+                    f"{P}\\SCD customer",
+                    "stg customer",
+                    "Microsoft.OLEDBSource",
+                    {"AccessMode": "0", "OpenRowset": "[stg].[customer]"},
+                    "DW",
+                ),
+                component(
+                    f"{P}\\SCD customer",
+                    "Slowly Changing Dimension",
+                    "Microsoft.SCD",
+                    {
+                        "SqlCommand": "SELECT customer_key, customer_code, customer_name, region, tier, valid_from, valid_to, is_current FROM dw.dim_customer",
+                        "CurrentRowWhere": "[is_current] = 1",
+                        "HistoricalAttributes": "region,tier",
+                        "ChangingAttributes": "customer_name",
+                        "BusinessKey": "customer_code",
+                        "IncomingRowChangeType": "1",
+                    },
+                    "DW",
+                ),
+                component(
+                    f"{P}\\SCD customer",
+                    "Expire current row",
+                    "Microsoft.OLEDBCommand",
+                    {
+                        "SqlCommand": "UPDATE dw.dim_customer SET valid_to = GETDATE(), is_current = 0 WHERE customer_code = ? AND is_current = 1"
+                    },
+                    "DW",
+                ),
+                component(
+                    f"{P}\\SCD customer",
+                    "Update changing attributes",
+                    "Microsoft.OLEDBCommand",
+                    {"SqlCommand": "UPDATE dw.dim_customer SET customer_name = ? WHERE customer_code = ?"},
+                    "DW",
+                ),
+                component(
+                    f"{P}\\SCD customer",
+                    "Insert new versions",
+                    "Microsoft.OLEDBDestination",
+                    {"AccessMode": "3", "OpenRowset": "[dw].[dim_customer]"},
+                    "DW",
+                ),
+            ],
+            [
+                ("stg customer", "Slowly Changing Dimension"),
+                ("Slowly Changing Dimension", "Expire current row"),
+                ("Slowly Changing Dimension", "Update changing attributes"),
+                ("Expire current row", "Insert new versions"),
+            ],
+        ),
+        on_error=True,
+    )
 
-    pk["Load_FactSales"] = package("Load_FactSales", ["DW"], data_flow(P, "Fact sales", [
-        component(f"{P}\\Fact sales", "stg order_line", "Microsoft.OLEDBSource",
-                  {"AccessMode": "0", "OpenRowset": "[stg].[order_line]"}, "DW"),
-        component(f"{P}\\Fact sales", "Lookup customer", "Microsoft.Lookup",
-                  {"SqlCommand": "SELECT customer_key, customer_code FROM dw.dim_customer WHERE is_current = 1",
-                   "CacheType": "0", "NoMatchBehavior": "1", "JoinColumns": "customer_code"}, "DW"),
-        component(f"{P}\\Fact sales", "Lookup product", "Microsoft.Lookup",
-                  {"SqlCommand": "SELECT product_key, product_code FROM dw.dim_product",
-                   "CacheType": "0", "NoMatchBehavior": "1", "JoinColumns": "product_code"}, "DW"),
-        component(f"{P}\\Fact sales", "Unknown members", "Microsoft.DerivedColumn",
-                  {"Expression": "customer_key = ISNULL(customer_key) ? -1 : customer_key; product_key = ISNULL(product_key) ? -1 : product_key; net_amount = quantity * unit_price"}),
-        component(f"{P}\\Fact sales", "Split bad quantities", "Microsoft.ConditionalSplit",
-                  {"Expression": "quantity <= 0", "OutputName": "Rejected"}),
-        component(f"{P}\\Fact sales", "fact_sales", "Microsoft.OLEDBDestination",
-                  {"AccessMode": "3", "OpenRowset": "[dw].[fact_sales]", "FastLoadOptions": "TABLOCK,CHECK_CONSTRAINTS"}, "DW"),
-        component(f"{P}\\Fact sales", "sales_rejected", "Microsoft.OLEDBDestination",
-                  {"AccessMode": "3", "OpenRowset": "[etl].[sales_rejected]"}, "DW"),
-    ], [("stg order_line", "Lookup customer"), ("Lookup customer", "Lookup product"),
-        ("Lookup product", "Unknown members"), ("Unknown members", "Split bad quantities"),
-        ("Split bad quantities", "fact_sales"), ("Split bad quantities", "sales_rejected")]),
-        on_error=True)
+    pk["Load_FactSales"] = package(
+        "Load_FactSales",
+        ["DW"],
+        data_flow(
+            P,
+            "Fact sales",
+            [
+                component(
+                    f"{P}\\Fact sales",
+                    "stg order_line",
+                    "Microsoft.OLEDBSource",
+                    {"AccessMode": "0", "OpenRowset": "[stg].[order_line]"},
+                    "DW",
+                ),
+                component(
+                    f"{P}\\Fact sales",
+                    "Lookup customer",
+                    "Microsoft.Lookup",
+                    {
+                        "SqlCommand": "SELECT customer_key, customer_code FROM dw.dim_customer WHERE is_current = 1",
+                        "CacheType": "0",
+                        "NoMatchBehavior": "1",
+                        "JoinColumns": "customer_code",
+                    },
+                    "DW",
+                ),
+                component(
+                    f"{P}\\Fact sales",
+                    "Lookup product",
+                    "Microsoft.Lookup",
+                    {
+                        "SqlCommand": "SELECT product_key, product_code FROM dw.dim_product",
+                        "CacheType": "0",
+                        "NoMatchBehavior": "1",
+                        "JoinColumns": "product_code",
+                    },
+                    "DW",
+                ),
+                component(
+                    f"{P}\\Fact sales",
+                    "Unknown members",
+                    "Microsoft.DerivedColumn",
+                    {
+                        "Expression": "customer_key = ISNULL(customer_key) ? -1 : customer_key; product_key = ISNULL(product_key) ? -1 : product_key; net_amount = quantity * unit_price"
+                    },
+                ),
+                component(
+                    f"{P}\\Fact sales",
+                    "Split bad quantities",
+                    "Microsoft.ConditionalSplit",
+                    {"Expression": "quantity <= 0", "OutputName": "Rejected"},
+                ),
+                component(
+                    f"{P}\\Fact sales",
+                    "fact_sales",
+                    "Microsoft.OLEDBDestination",
+                    {
+                        "AccessMode": "3",
+                        "OpenRowset": "[dw].[fact_sales]",
+                        "FastLoadOptions": "TABLOCK,CHECK_CONSTRAINTS",
+                    },
+                    "DW",
+                ),
+                component(
+                    f"{P}\\Fact sales",
+                    "sales_rejected",
+                    "Microsoft.OLEDBDestination",
+                    {"AccessMode": "3", "OpenRowset": "[etl].[sales_rejected]"},
+                    "DW",
+                ),
+            ],
+            [
+                ("stg order_line", "Lookup customer"),
+                ("Lookup customer", "Lookup product"),
+                ("Lookup product", "Unknown members"),
+                ("Unknown members", "Split bad quantities"),
+                ("Split bad quantities", "fact_sales"),
+                ("Split bad quantities", "sales_rejected"),
+            ],
+        ),
+        on_error=True,
+    )
 
-    loop_body = "\n".join([
-        data_flow(f"{P}\\For each dealer file", "Load file", [
-            component(f"{P}\\For each dealer file\\Load file", "Dealer CSV", "Microsoft.FlatFileSource",
-                      {"FileNameColumnName": "source_file"}, "DealerFile"),
-            component(f"{P}\\For each dealer file\\Load file", "Convert types", "Microsoft.DataConvert",
-                      {"Conversions": "target_amount:DT_NUMERIC(18,2); month_start:DT_DBDATE"}),
-            component(f"{P}\\For each dealer file\\Load file", "stg dealer_target", "Microsoft.OLEDBDestination",
-                      {"AccessMode": "3", "OpenRowset": "[stg].[dealer_target]"}, "DW"),
-        ], [("Dealer CSV", "Convert types"), ("Convert types", "stg dealer_target")]),
-        task(f"{P}\\For each dealer file", "Archive file", "Microsoft.FileSystemTask",
-             '        <FileSystemData TaskOperationType="MoveFile" TaskSourcePath="User::CurrentFile" '
-             'TaskDestinationPath="\\\\fileshare01\\dealers\\archive" />'),
-    ])
+    loop_body = "\n".join(
+        [
+            data_flow(
+                f"{P}\\For each dealer file",
+                "Load file",
+                [
+                    component(
+                        f"{P}\\For each dealer file\\Load file",
+                        "Dealer CSV",
+                        "Microsoft.FlatFileSource",
+                        {"FileNameColumnName": "source_file"},
+                        "DealerFile",
+                    ),
+                    component(
+                        f"{P}\\For each dealer file\\Load file",
+                        "Convert types",
+                        "Microsoft.DataConvert",
+                        {"Conversions": "target_amount:DT_NUMERIC(18,2); month_start:DT_DBDATE"},
+                    ),
+                    component(
+                        f"{P}\\For each dealer file\\Load file",
+                        "stg dealer_target",
+                        "Microsoft.OLEDBDestination",
+                        {"AccessMode": "3", "OpenRowset": "[stg].[dealer_target]"},
+                        "DW",
+                    ),
+                ],
+                [("Dealer CSV", "Convert types"), ("Convert types", "stg dealer_target")],
+            ),
+            task(
+                f"{P}\\For each dealer file",
+                "Archive file",
+                "Microsoft.FileSystemTask",
+                '        <FileSystemData TaskOperationType="MoveFile" TaskSourcePath="User::CurrentFile" '
+                'TaskDestinationPath="\\\\fileshare01\\dealers\\archive" />',
+            ),
+        ]
+    )
     foreach = (
         f'    <DTS:Executable DTS:refId="{P}\\For each dealer file" DTS:CreationName="STOCK:FOREACHLOOP" '
         f'DTS:DTSID="{gid(P, "foreach")}" DTS:ExecutableType="STOCK:FOREACHLOOP" DTS:ObjectName="For each dealer file">\n'
@@ -301,11 +509,19 @@ def build() -> dict[str, str]:
         f"      <DTS:Executables>\n{loop_body}\n      </DTS:Executables>\n"
         "    </DTS:Executable>"
     )
-    pk["Import_DealerTargets"] = package("Import_DealerTargets", ["DW", "DealerFile"], "\n".join([
-        sql_task(P, "Truncate stage", "DW", "TRUNCATE TABLE stg.dealer_target;"), foreach,
-        sql_task(P, "Merge targets", "DW", "EXEC etl.usp_merge_dealer_target;"),
-    ]), vars_=[("CurrentFile", 8, "")],
-        pcs=[("Truncate stage", "For each dealer file", 0, None), ("For each dealer file", "Merge targets", 0, None)])
+    pk["Import_DealerTargets"] = package(
+        "Import_DealerTargets",
+        ["DW", "DealerFile"],
+        "\n".join(
+            [
+                sql_task(P, "Truncate stage", "DW", "TRUNCATE TABLE stg.dealer_target;"),
+                foreach,
+                sql_task(P, "Merge targets", "DW", "EXEC etl.usp_merge_dealer_target;"),
+            ]
+        ),
+        vars_=[("CurrentFile", 8, "")],
+        pcs=[("Truncate stage", "For each dealer file", 0, None), ("For each dealer file", "Merge targets", 0, None)],
+    )
 
     script = (
         '        <ScriptProject Name="ST_PlantExtract" VSTAMajorVersion="14" VSTAMinorVersion="0" Language="CSharp" '
@@ -314,36 +530,70 @@ def build() -> dict[str, str]:
         "public void Main()\n{\n"
         "    // Builds the fixed-width extract the plant partner expects:\n"
         "    // header record, one record per plant per day, trailer with a checksum.\n"
-        "    var path = Dts.Variables[\"User::ExtractFile\"].Value.ToString();\n"
+        '    var path = Dts.Variables["User::ExtractFile"].Value.ToString();\n'
         "    // ... 140 lines of string formatting and a custom mod-97 checksum ...\n"
         "    Dts.TaskResult = (int)ScriptResults.Success;\n}\n"
         "]]></ProjectItem>\n        </ScriptProject>"
     )
-    pk["Export_PlantExtract"] = package("Export_PlantExtract", ["DW", "PlantFTP"], "\n".join([
-        task(P, "Build extract file", "Microsoft.ScriptTask", script),
-        task(P, "Upload to partner", "Microsoft.FtpTask",
-             '        <FtpData Operation="Send" LocalPath="User::ExtractFile" RemotePath="/inbound/northgate" '
-             f'Connection="{gid("cm", "PlantFTP")}" />'),
-    ]), vars_=[("ExtractDate", 7, "2026-01-01"), ("ExtractFile", 8, "")],
-        pcs=[("Build extract file", "Upload to partner", 0, None)])
+    pk["Export_PlantExtract"] = package(
+        "Export_PlantExtract",
+        ["DW", "PlantFTP"],
+        "\n".join(
+            [
+                task(P, "Build extract file", "Microsoft.ScriptTask", script),
+                task(
+                    P,
+                    "Upload to partner",
+                    "Microsoft.FtpTask",
+                    '        <FtpData Operation="Send" LocalPath="User::ExtractFile" RemotePath="/inbound/northgate" '
+                    f'Connection="{gid("cm", "PlantFTP")}" />',
+                ),
+            ]
+        ),
+        vars_=[("ExtractDate", 7, "2026-01-01"), ("ExtractFile", 8, "")],
+        pcs=[("Build extract file", "Upload to partner", 0, None)],
+    )
 
-    pk["Maintenance_Purge"] = package("Maintenance_Purge", ["DW"], sql_task(
-        P, "Purge old rejects", "DW",
-        "DELETE FROM etl.sales_rejected WHERE rejected_at < DATEADD(DAY, -90, GETDATE());"))
+    pk["Maintenance_Purge"] = package(
+        "Maintenance_Purge",
+        ["DW"],
+        sql_task(
+            P,
+            "Purge old rejects",
+            "DW",
+            "DELETE FROM etl.sales_rejected WHERE rejected_at < DATEADD(DAY, -90, GETDATE());",
+        ),
+    )
 
     def exec_pkg(name: str, child: str) -> str:
-        return task(P, name, "Microsoft.ExecutePackageTask",
-                    f'        <ExecutePackageTask><UseProjectReference>True</UseProjectReference>'
-                    f"<PackageName>{child}.dtsx</PackageName></ExecutePackageTask>")
+        return task(
+            P,
+            name,
+            "Microsoft.ExecutePackageTask",
+            f"        <ExecutePackageTask><UseProjectReference>True</UseProjectReference>"
+            f"<PackageName>{child}.dtsx</PackageName></ExecutePackageTask>",
+        )
 
-    children = ["Stage_Customers", "Stage_Orders", "Load_DimCustomer", "Load_FactSales",
-                "Import_DealerTargets", "Export_PlantExtract"]
-    pk["Master_Nightly"] = package("Master_Nightly", ["SMTP"], "\n".join(
-        exec_pkg(f"Run {c}", c) for c in children
-    ), pcs=[("Run Stage_Customers", "Run Load_DimCustomer", 0, None),
+    children = [
+        "Stage_Customers",
+        "Stage_Orders",
+        "Load_DimCustomer",
+        "Load_FactSales",
+        "Import_DealerTargets",
+        "Export_PlantExtract",
+    ]
+    pk["Master_Nightly"] = package(
+        "Master_Nightly",
+        ["SMTP"],
+        "\n".join(exec_pkg(f"Run {c}", c) for c in children),
+        pcs=[
+            ("Run Stage_Customers", "Run Load_DimCustomer", 0, None),
             ("Run Stage_Orders", "Run Load_FactSales", 0, None),
             ("Run Load_DimCustomer", "Run Load_FactSales", 0, None),
-            ("Run Load_FactSales", "Run Export_PlantExtract", 0, None)], on_error=True)
+            ("Run Load_FactSales", "Run Export_PlantExtract", 0, None),
+        ],
+        on_error=True,
+    )
     return pk
 
 
