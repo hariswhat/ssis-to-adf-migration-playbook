@@ -18,6 +18,17 @@
           },
           "runtime": "x64",
           "loggingLevel": "Basic",
+          "projectParameters": {
+            "DW_ConnectionString": {
+              "value": "Data Source=sql-ngbp-dw-dev.database.windows.net;Initial Catalog=NorthgateDW;Provider=MSOLEDBSQL.1;"
+            }
+          },
+          "propertyOverrides": {
+            "\\Package.Connections[DW].Properties[ConnectUsingManagedIdentity]": {
+              "value": "True",
+              "isSensitive": false
+            }
+          },
           "connectVia": {
             "referenceName": "ir-azure-ssis",
             "type": "IntegrationRuntimeReference"

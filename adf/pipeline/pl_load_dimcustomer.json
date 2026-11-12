@@ -13,7 +13,16 @@
           "type": "LinkedServiceReference"
         },
         "typeProperties": {
-          "storedProcedureName": "etl.usp_load_dim_customer"
+          "storedProcedureName": "etl.usp_load_dim_customer",
+          "storedProcedureParameters": {
+            "load_ts": {
+              "value": {
+                "value": "@convertFromUtc(pipeline().TriggerTime, 'Eastern Standard Time')",
+                "type": "Expression"
+              },
+              "type": "DateTime"
+            }
+          }
         }
       },
       {
@@ -37,6 +46,22 @@
             "value": "@json(concat('{\"pipeline\": \"', pipeline().Pipeline, '\", \"activity\": \"SCD customer\", \"run\": \"', pipeline().RunId, '\"}'))",
             "type": "Expression"
           }
+        }
+      },
+      {
+        "name": "Fail after SCD customer",
+        "type": "Fail",
+        "dependsOn": [
+          {
+            "activity": "Alert SCD customer failed",
+            "dependencyConditions": [
+              "Completed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "message": "SCD customer failed",
+          "errorCode": "ACTIVITY_FAILED"
         }
       }
     ],

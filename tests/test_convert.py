@@ -84,7 +84,10 @@ def test_blocked_package_is_lifted(results):
     r = results["Export_PlantExtract"]
     (act,) = r.pipeline["properties"]["activities"]
     assert act["type"] == "ExecuteSSISPackage"
-    assert r.manual == ["blocked: Build extract file"]
+    assert r.manual == [
+        "blocked: Build extract file",
+        "connection PlantFTP: needs a network path from the Azure-SSIS IR (runbook section 1)",
+    ]
 
 
 def test_rewrites_call_named_procedures(results):
@@ -151,3 +154,74 @@ def test_trigger_follows_the_agent_schedule(tmp_path):
     )
     with pytest.raises(ValueError, match="only daily"):
         nightly_trigger(jobs)
+
+
+def test_failures_are_alerted_and_still_fail_the_run(results):
+    for name in ("Load_DimCustomer", "Load_FactSales", "Master_Nightly"):
+        acts = {a["name"]: a for a in results[name].pipeline["properties"]["activities"]}
+        alerts = [a for a in acts.values() if a["type"] == "WebActivity"]
+        assert alerts
+        for alert in alerts:
+            fail = acts[alert["name"].replace("Alert ", "Fail after ").removesuffix(" failed")]
+            assert fail["type"] == "Fail"
+            assert fail["dependsOn"] == [{"activity": alert["name"], "dependencyConditions": ["Completed"]}]
+
+
+def test_truncate_becomes_the_copys_pre_copy_script(results):
+    acts = results["Stage_Customers"].pipeline["properties"]["activities"]
+    assert [a["type"] for a in acts] == ["Copy"]
+    assert acts[0]["typeProperties"]["sink"]["preCopyScript"] == "TRUNCATE TABLE stg.customer;"
+    # inside a loop the truncate must run once, not per file: left as a Script
+    dealer = results["Import_DealerTargets"].pipeline["properties"]["activities"]
+    assert dealer[0]["type"] == "Script"
+
+
+def test_watermark_moves_into_the_fact_procedure(results):
+    r = results["Stage_Orders"]
+    names = [a["name"] for a in r.pipeline["properties"]["activities"]]
+    assert "If Set watermark" not in names and "Set watermark" not in names
+    assert any("moved to etl.usp_load_fact_sales" in m for m in r.manual)
+    proc = (ROOT / "sql" / "procedures" / "usp_load_fact_sales.sql").read_text()
+    assert "UPDATE etl.watermark" in proc
+
+
+def test_dimension_load_time_is_passed_in_eastern_time(results):
+    (sp,) = (a for a in results["Load_DimCustomer"].pipeline["properties"]["activities"] if a["name"] == "SCD customer")
+    p = sp["typeProperties"]["storedProcedureParameters"]["load_ts"]
+    assert p["type"] == "DateTime"
+    assert "convertFromUtc(pipeline().TriggerTime, 'Eastern Standard Time')" in p["value"]["value"]
+
+
+def test_flat_file_name_column_is_kept(results):
+    loop = next(
+        a for a in results["Import_DealerTargets"].pipeline["properties"]["activities"] if a["type"] == "ForEach"
+    )
+    load = next(a for a in loop["typeProperties"]["activities"] if a["name"] == "Load file")
+    assert load["typeProperties"]["source"]["additionalColumns"] == [{"name": "source_file", "value": "$$FILEPATH"}]
+
+
+def test_expression_only_constraint_waits_for_completion(packages, monkeypatch):
+    import copy
+
+    from playbook.convert import PATTERNS, Converter
+
+    monkeypatch.setitem(PATTERNS, "moved", {})  # keep the constrained task
+
+    pkg = copy.deepcopy(packages["Stage_Orders"])
+    pc = next(c for c in pkg.constraints if c.expression)
+    pc.eval_op, pc.logical_and = 1, False
+    c = Converter(pkg)
+    acts = c.convert()["properties"]["activities"]
+    assert any("OR constraint" in m for m in c.manual)
+    if_acts = [a for a in acts if a["type"] == "IfCondition"]
+    assert if_acts and all(a["dependsOn"][0]["dependencyConditions"] == ["Completed"] for a in if_acts)
+
+
+def test_any_package_can_be_lifted_until_its_wave():
+    lifted = {r.package: r for r in convert_project(ESTATE, {"Load_FactSales", "Master_Nightly"})}
+    (act,) = lifted["Load_FactSales"].pipeline["properties"]["activities"]
+    assert act["type"] == "ExecuteSSISPackage"
+    assert "DW_ConnectionString" in act["typeProperties"]["projectParameters"]
+    # Master_Nightly has no warehouse connection, so nothing to override
+    (act,) = lifted["Master_Nightly"].pipeline["properties"]["activities"]
+    assert "projectParameters" not in act["typeProperties"]

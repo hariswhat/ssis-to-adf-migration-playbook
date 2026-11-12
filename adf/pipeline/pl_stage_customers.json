@@ -4,33 +4,9 @@
     "description": "Converted from SSIS package Stage_Customers by playbook.convert.",
     "activities": [
       {
-        "name": "Truncate stage",
-        "type": "Script",
-        "dependsOn": [],
-        "linkedServiceName": {
-          "referenceName": "ls_dw_azuresql",
-          "type": "LinkedServiceReference"
-        },
-        "typeProperties": {
-          "scripts": [
-            {
-              "type": "NonQuery",
-              "text": "TRUNCATE TABLE stg.customer;"
-            }
-          ]
-        }
-      },
-      {
         "name": "Copy customers",
         "type": "Copy",
-        "dependsOn": [
-          {
-            "activity": "Truncate stage",
-            "dependencyConditions": [
-              "Succeeded"
-            ]
-          }
-        ],
+        "dependsOn": [],
         "inputs": [
           {
             "referenceName": "ds_erp_query",
@@ -55,7 +31,8 @@
           "sink": {
             "type": "AzureSqlSink",
             "writeBehavior": "insert",
-            "tableOption": "none"
+            "tableOption": "none",
+            "preCopyScript": "TRUNCATE TABLE stg.customer;"
           }
         }
       }

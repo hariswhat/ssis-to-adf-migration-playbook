@@ -3,7 +3,11 @@
   "properties": {
     "type": "SqlServer",
     "typeProperties": {
-      "connectionString": "Data Source=ERPSQL01;Initial Catalog=ERP;Integrated Security=False",
+      "server": "ERPSQL01",
+      "database": "ERP",
+      "encrypt": "mandatory",
+      "trustServerCertificate": false,
+      "authenticationType": "SQL",
       "userName": "svc_adf_erp_reader",
       "password": {
         "type": "AzureKeyVaultSecret",

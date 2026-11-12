@@ -3,7 +3,10 @@
   "properties": {
     "type": "AzureSqlDatabase",
     "typeProperties": {
-      "connectionString": "Data Source=sql-ngbp-dw-dev.database.windows.net;Initial Catalog=NorthgateDW",
+      "server": "sql-ngbp-dw-dev.database.windows.net",
+      "database": "NorthgateDW",
+      "encrypt": "mandatory",
+      "trustServerCertificate": false,
       "authenticationType": "SystemAssignedManagedIdentity"
     }
   }

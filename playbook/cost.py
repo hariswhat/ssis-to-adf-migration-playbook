@@ -4,7 +4,8 @@ ADF bills activity runs (per 1,000, priced by the integration runtime they
 run on), activity execution time (data movement by DIU-hour on the Azure IR,
 by hour on a self-hosted IR) and Azure-SSIS IR node hours while it is
 running. This walks adf/pipeline from pl_master_nightly and counts the first
-of these exactly; time-based meters depend on run durations nobody has
+of these for a night where everything succeeds and every If Condition is
+true (the trigger run itself is not an activity run); time-based meters depend on run durations nobody has
 measured yet, so they are inputs.
 
 Prices are not stored here: they change and vary by region. Pass them from
@@ -60,10 +61,13 @@ class RunCounter:
         return "self-hosted" if "self-hosted" in irs else "azure"
 
     def walk(self, acts: list[dict], times: int = 1) -> None:
+        skipped: set[str] = set()
         for a in acts:
             deps = [c for d in a["dependsOn"] for c in d["dependencyConditions"]]
-            if deps and all(c == "Failed" for c in deps):
-                continue  # failure alerts: not run on a good night
+            after_skipped = any(d["activity"] in skipped for d in a["dependsOn"])
+            if after_skipped or (deps and all(c == "Failed" for c in deps)):
+                skipped.add(a["name"])
+                continue  # failure paths: not run on a good night
             self.runs[f"{self.ir(a)} {a['type']}"] += times
             tp = a.get("typeProperties", {})
             if a["type"] == "ExecutePipeline":

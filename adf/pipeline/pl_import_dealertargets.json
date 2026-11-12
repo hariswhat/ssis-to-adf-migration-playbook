@@ -111,7 +111,13 @@
               ],
               "typeProperties": {
                 "source": {
-                  "type": "DelimitedTextSource"
+                  "type": "DelimitedTextSource",
+                  "additionalColumns": [
+                    {
+                      "name": "source_file",
+                      "value": "$$FILEPATH"
+                    }
+                  ]
                 },
                 "sink": {
                   "type": "AzureSqlSink",
@@ -209,11 +215,11 @@
     "parameters": {
       "inbound_folder": {
         "type": "string",
-        "defaultValue": "dealers/inbound"
+        "defaultValue": "inbound"
       },
       "archive_folder": {
         "type": "string",
-        "defaultValue": "dealers/archive"
+        "defaultValue": "archive"
       }
     },
     "variables": {

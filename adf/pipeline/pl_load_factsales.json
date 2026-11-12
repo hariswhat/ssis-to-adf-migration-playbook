@@ -38,6 +38,22 @@
             "type": "Expression"
           }
         }
+      },
+      {
+        "name": "Fail after Fact sales",
+        "type": "Fail",
+        "dependsOn": [
+          {
+            "activity": "Alert Fact sales failed",
+            "dependencyConditions": [
+              "Completed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "message": "Fact sales failed",
+          "errorCode": "ACTIVITY_FAILED"
+        }
       }
     ],
     "parameters": {},

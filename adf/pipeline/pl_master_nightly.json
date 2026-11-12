@@ -126,6 +126,22 @@
         }
       },
       {
+        "name": "Fail after Run Stage_Customers",
+        "type": "Fail",
+        "dependsOn": [
+          {
+            "activity": "Alert Run Stage_Customers failed",
+            "dependencyConditions": [
+              "Completed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "message": "Run Stage_Customers failed",
+          "errorCode": "ACTIVITY_FAILED"
+        }
+      },
+      {
         "name": "Alert Run Stage_Orders failed",
         "type": "WebActivity",
         "dependsOn": [
@@ -146,6 +162,22 @@
             "value": "@json(concat('{\"pipeline\": \"', pipeline().Pipeline, '\", \"activity\": \"Run Stage_Orders\", \"run\": \"', pipeline().RunId, '\"}'))",
             "type": "Expression"
           }
+        }
+      },
+      {
+        "name": "Fail after Run Stage_Orders",
+        "type": "Fail",
+        "dependsOn": [
+          {
+            "activity": "Alert Run Stage_Orders failed",
+            "dependencyConditions": [
+              "Completed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "message": "Run Stage_Orders failed",
+          "errorCode": "ACTIVITY_FAILED"
         }
       },
       {
@@ -172,6 +204,22 @@
         }
       },
       {
+        "name": "Fail after Run Load_DimCustomer",
+        "type": "Fail",
+        "dependsOn": [
+          {
+            "activity": "Alert Run Load_DimCustomer failed",
+            "dependencyConditions": [
+              "Completed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "message": "Run Load_DimCustomer failed",
+          "errorCode": "ACTIVITY_FAILED"
+        }
+      },
+      {
         "name": "Alert Run Load_FactSales failed",
         "type": "WebActivity",
         "dependsOn": [
@@ -192,6 +240,22 @@
             "value": "@json(concat('{\"pipeline\": \"', pipeline().Pipeline, '\", \"activity\": \"Run Load_FactSales\", \"run\": \"', pipeline().RunId, '\"}'))",
             "type": "Expression"
           }
+        }
+      },
+      {
+        "name": "Fail after Run Load_FactSales",
+        "type": "Fail",
+        "dependsOn": [
+          {
+            "activity": "Alert Run Load_FactSales failed",
+            "dependencyConditions": [
+              "Completed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "message": "Run Load_FactSales failed",
+          "errorCode": "ACTIVITY_FAILED"
         }
       },
       {
@@ -218,6 +282,22 @@
         }
       },
       {
+        "name": "Fail after Run Import_DealerTargets",
+        "type": "Fail",
+        "dependsOn": [
+          {
+            "activity": "Alert Run Import_DealerTargets failed",
+            "dependencyConditions": [
+              "Completed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "message": "Run Import_DealerTargets failed",
+          "errorCode": "ACTIVITY_FAILED"
+        }
+      },
+      {
         "name": "Alert Run Export_PlantExtract failed",
         "type": "WebActivity",
         "dependsOn": [
@@ -238,6 +318,22 @@
             "value": "@json(concat('{\"pipeline\": \"', pipeline().Pipeline, '\", \"activity\": \"Run Export_PlantExtract\", \"run\": \"', pipeline().RunId, '\"}'))",
             "type": "Expression"
           }
+        }
+      },
+      {
+        "name": "Fail after Run Export_PlantExtract",
+        "type": "Fail",
+        "dependsOn": [
+          {
+            "activity": "Alert Run Export_PlantExtract failed",
+            "dependencyConditions": [
+              "Completed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "message": "Run Export_PlantExtract failed",
+          "errorCode": "ACTIVITY_FAILED"
         }
       }
     ],

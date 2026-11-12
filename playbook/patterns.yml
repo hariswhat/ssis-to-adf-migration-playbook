@@ -105,5 +105,21 @@ bands:                   # total points -> complexity
 # without an entry here is converted to a call to a placeholder name and
 # listed as manual work.
 rewrites:
-  Load_DimCustomer/SCD customer: etl.usp_load_dim_customer
-  Load_FactSales/Fact sales: etl.usp_load_fact_sales
+  Load_DimCustomer/SCD customer:
+    procedure: etl.usp_load_dim_customer
+    parameters:
+      # SSIS stamped versions with GETDATE() on the on-premises server
+      # (Eastern time). Keep that clock, and one value per run (ADR-0003).
+      load_ts:
+        type: DateTime
+        value: "@convertFromUtc(pipeline().TriggerTime, 'Eastern Standard Time')"
+  Load_FactSales/Fact sales:
+    procedure: etl.usp_load_fact_sales
+
+# Tasks whose work moves into a rewrite instead of being converted. The
+# converter leaves them out and lists them as manual items.
+moved:
+  # Advancing the watermark before the fact load has used the staged lines
+  # lost them if the fact load failed; the procedure now advances it in the
+  # same transaction as the load (ADR-0003).
+  Stage_Orders/Set watermark: etl.usp_load_fact_sales

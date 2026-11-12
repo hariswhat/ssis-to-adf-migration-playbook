@@ -4,33 +4,9 @@
     "description": "Converted from SSIS package Stage_Orders by playbook.convert.",
     "activities": [
       {
-        "name": "Truncate stage",
-        "type": "Script",
-        "dependsOn": [],
-        "linkedServiceName": {
-          "referenceName": "ls_dw_azuresql",
-          "type": "LinkedServiceReference"
-        },
-        "typeProperties": {
-          "scripts": [
-            {
-              "type": "NonQuery",
-              "text": "TRUNCATE TABLE stg.order_line;"
-            }
-          ]
-        }
-      },
-      {
         "name": "Get watermark",
         "type": "Lookup",
-        "dependsOn": [
-          {
-            "activity": "Truncate stage",
-            "dependencyConditions": [
-              "Succeeded"
-            ]
-          }
-        ],
+        "dependsOn": [],
         "typeProperties": {
           "source": {
             "type": "AzureSqlSource",
@@ -106,7 +82,8 @@
           "sink": {
             "type": "AzureSqlSink",
             "writeBehavior": "insert",
-            "tableOption": "none"
+            "tableOption": "none",
+            "preCopyScript": "TRUNCATE TABLE stg.order_line;"
           }
         }
       },
@@ -127,44 +104,6 @@
             "value": "@concat('SELECT order_id, line_number, customer_code, product_code, order_date, quantity, unit_price, modified_at FROM dbo.order_line WHERE modified_at > ''', variables('LastWatermark'), '''')",
             "type": "Expression"
           }
-        }
-      },
-      {
-        "name": "If Set watermark",
-        "type": "IfCondition",
-        "description": "SSIS precedence constraint expression: @[User::RowsCopied] > 0",
-        "dependsOn": [
-          {
-            "activity": "Copy new order lines",
-            "dependencyConditions": [
-              "Succeeded"
-            ]
-          }
-        ],
-        "typeProperties": {
-          "expression": {
-            "value": "@greater(activity('Copy new order lines').output.rowsCopied, 0)",
-            "type": "Expression"
-          },
-          "ifTrueActivities": [
-            {
-              "name": "Set watermark",
-              "type": "Script",
-              "dependsOn": [],
-              "linkedServiceName": {
-                "referenceName": "ls_dw_azuresql",
-                "type": "LinkedServiceReference"
-              },
-              "typeProperties": {
-                "scripts": [
-                  {
-                    "type": "NonQuery",
-                    "text": "UPDATE etl.watermark SET watermark_at = (SELECT MAX(modified_at) FROM stg.order_line) WHERE table_name = 'order_line';"
-                  }
-                ]
-              }
-            }
-          ]
         }
       }
     ],

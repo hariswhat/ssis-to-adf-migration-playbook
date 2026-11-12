@@ -50,6 +50,7 @@ COPY_SHAPED = {
 DEPENDENCY = {0: "Succeeded", 1: "Failed", 2: "Completed"}
 LINKED = {"ERP": "ls_erp_sqlserver", "DW": "ls_dw_azuresql", "DealerFile": "ls_fileshare"}
 SSIS_FOLDER = "NorthgateETL"
+LIFTED_DW = "Data Source=sql-ngbp-dw-dev.database.windows.net;Initial Catalog=NorthgateDW;Provider=MSOLEDBSQL.1;"
 JOBS = Path(__file__).resolve().parents[1] / "estate" / "agent_jobs.yml"
 
 
@@ -107,6 +108,17 @@ def _dep(names: list[tuple[str, str]]) -> list[dict]:
     return [{"activity": a, "dependencyConditions": [c]} for a, c in names]
 
 
+def _proc_params(params: dict | None) -> dict:
+    if not params:
+        return {}
+    return {
+        "storedProcedureParameters": {
+            name: {"value": {"value": p["value"], "type": "Expression"}, "type": p["type"]}
+            for name, p in params.items()
+        }
+    }
+
+
 def _sql_source(conn: str | None) -> str:
     return "SqlServerSource" if conn == "ERP" else "AzureSqlSource"
 
@@ -123,6 +135,8 @@ class Converter:
     def sql_task(self, t: Task) -> list[dict]:
         sql = t.properties.get("SqlStatementSource", "")
         conn = self.pkg.connection_by_id(t.properties.get("Connection", ""))
+        if not conn or conn.name not in LINKED:
+            self.manual.append(f"{t.name}: connection not mapped to a linked service; using the warehouse")
         ls = LINKED.get(conn.name if conn else "", "ls_dw_azuresql")
         if t.properties.get("ResultType") == "ResultSetType_SingleRow":
             var = t.properties.get("DtsVariableName", "").removeprefix("User::")
@@ -138,7 +152,10 @@ class Converter:
                     "dependsOn": [],
                     "typeProperties": {
                         "source": {"type": _sql_source(conn.name if conn else None), "sqlReaderQuery": sql},
-                        "dataset": {"referenceName": "ds_dw_query", "type": "DatasetReference"},
+                        "dataset": {
+                            "referenceName": "ds_erp_query" if conn and conn.name == "ERP" else "ds_dw_query",
+                            "type": "DatasetReference",
+                        },
                         "firstRowOnly": True,
                     },
                 },
@@ -156,7 +173,10 @@ class Converter:
                 },
             ]
         if re.match(r"\s*EXEC(UTE)?\s+", sql, re.I):
-            proc = re.match(r"\s*EXEC(?:UTE)?\s+([\w.\[\]]+)", sql, re.I).group(1)
+            m = re.match(r"\s*EXEC(?:UTE)?\s+([\w.\[\]]+)\s*(.*?);?\s*$", sql, re.I | re.S)
+            proc = m.group(1)
+            if m.group(2).strip():
+                self.manual.append(f"{t.name}: EXEC arguments not converted: {m.group(2).strip()}")
             return [
                 {
                     "name": t.name,
@@ -186,6 +206,11 @@ class Converter:
                     self.row_counts[c.properties.get("VariableName", "").removeprefix("User::")] = t.name
             if src.class_id == "Microsoft.FlatFileSource":
                 source = {"type": "DelimitedTextSource"}
+                if src.properties.get("FileNameColumnName"):
+                    # the SSIS source adds the file path as a column; Copy does the same
+                    source["additionalColumns"] = [
+                        {"name": src.properties["FileNameColumnName"], "value": "$$FILEPATH"}
+                    ]
                 inputs = [
                     {
                         "referenceName": "ds_fileshare_csv",
@@ -230,7 +255,10 @@ class Converter:
                 }
             ]
         key = f"{self.pkg.name}/{t.name}"
-        proc = PATTERNS.get("rewrites", {}).get(key)
+        rewrite = PATTERNS.get("rewrites", {}).get(key) or {}
+        if isinstance(rewrite, str):
+            rewrite = {"procedure": rewrite}
+        proc = rewrite.get("procedure")
         if not proc:
             proc = f"etl.usp_{re.sub(r'[^a-z0-9]+', '_', key.lower())}"
             self.manual.append(f"{t.name}: no set-based rewrite named in patterns.yml; {proc} is a placeholder")
@@ -241,7 +269,7 @@ class Converter:
                 "dependsOn": [],
                 "description": f"Set-based rewrite of the SSIS data flow '{t.name}'.",
                 "linkedServiceName": {"referenceName": "ls_dw_azuresql", "type": "LinkedServiceReference"},
-                "typeProperties": {"storedProcedureName": proc},
+                "typeProperties": {"storedProcedureName": proc} | _proc_params(rewrite.get("parameters")),
             }
         ]
 
@@ -363,9 +391,40 @@ class Converter:
 
     # --- package -----------------------------------------------------------
 
+    def _fold_truncates(self, top: list[Task], by_task: dict[str, list[dict]]) -> None:
+        """A task that only truncates the table a later Copy loads becomes the
+        Copy's pre-copy script, so rerunning the Copy repeats the truncate."""
+        for t in top:
+            acts = by_task[t.name]
+            if len(acts) != 1 or acts[0]["type"] != "Script":
+                continue
+            m = re.fullmatch(
+                r"\s*TRUNCATE\s+TABLE\s+([\w.]+)\s*;?\s*", acts[0]["typeProperties"]["scripts"][0]["text"], re.I
+            )
+            if not m or any(pc.target == t.name for pc in self.pkg.constraints):
+                continue
+            copies = [
+                a
+                for n, aa in by_task.items()
+                for a in aa
+                if a["type"] == "Copy"
+                and ".".join(a["outputs"][0].get("parameters", {}).values()).lower() == m.group(1).lower()
+            ]
+            if len(copies) == 1:
+                copies[0]["typeProperties"]["sink"]["preCopyScript"] = m.group(0).strip()
+                by_task[t.name] = []
+
     def convert(self) -> dict:
         top = [t for t in self.pkg.tasks if not t.in_event_handler]
-        by_task: dict[str, list[dict]] = {t.name: self.task(t) for t in top}
+        moved = PATTERNS.get("moved", {})
+        by_task: dict[str, list[dict]] = {}
+        for t in top:
+            if f"{self.pkg.name}/{t.name}" in moved:
+                self.manual.append(f"{t.name}: moved to {moved[f'{self.pkg.name}/{t.name}']}")
+                by_task[t.name] = []
+            else:
+                by_task[t.name] = self.task(t)
+        self._fold_truncates(top, by_task)
         activities: list[dict] = []
         for acts in by_task.values():
             activities += acts
@@ -398,7 +457,12 @@ class Converter:
         for pc in self.pkg.constraints:
             if pc.source not in last or pc.target not in first:
                 continue
-            cond = DEPENDENCY[pc.value]
+            if not pc.logical_and:
+                self.manual.append(f"{pc.source} -> {pc.target}: OR constraint wired as AND; ADF has no OR")
+            if pc.eval_op == 4:
+                self.manual.append(f"{pc.source} -> {pc.target}: 'expression or constraint' wired as both")
+            # expression only: the target waits for the source to finish, whatever its outcome
+            cond = "Completed" if pc.eval_op == 1 else DEPENDENCY[pc.value]
             target = next(a for a in activities if a["name"] == first[pc.target])
             if pc.expression:
                 body = translate(pc.expression, self.row_counts)
@@ -429,9 +493,10 @@ class Converter:
                     f"@json(concat('{{\"pipeline\": \"', pipeline().Pipeline, '\", "
                     f"\"activity\": \"{a['name']}\", \"run\": \"', pipeline().RunId, '\"}}'))"
                 )
+                alert = f"Alert {a['name']} failed"
                 activities.append(
                     {
-                        "name": f"Alert {a['name']} failed",
+                        "name": alert,
                         "type": "WebActivity",
                         "dependsOn": _dep([(a["name"], "Failed")]),
                         "typeProperties": {
@@ -441,11 +506,21 @@ class Converter:
                         },
                     }
                 )
+                # A handled failure would leave the run Succeeded; SSIS OnError did not
+                # cancel the failure either, so fail the pipeline after alerting.
+                activities.append(
+                    {
+                        "name": f"Fail after {a['name']}",
+                        "type": "Fail",
+                        "dependsOn": _dep([(alert, "Completed")]),
+                        "typeProperties": {"message": f"{a['name']} failed", "errorCode": "ACTIVITY_FAILED"},
+                    }
+                )
         params = {}
         if any(a["type"] == "GetMetadata" for a in activities):
             params = {
-                "inbound_folder": {"type": "string", "defaultValue": "dealers/inbound"},
-                "archive_folder": {"type": "string", "defaultValue": "dealers/archive"},
+                "inbound_folder": {"type": "string", "defaultValue": "inbound"},
+                "archive_folder": {"type": "string", "defaultValue": "archive"},
             }
         return {
             "name": pipeline_name(self.pkg.name),
@@ -459,8 +534,21 @@ class Converter:
         }
 
 
-def lift(pkg: Package) -> dict:
-    """Packages with blockers run unchanged on the Azure-SSIS IR."""
+def lift(pkg: Package) -> tuple[dict, list[str]]:
+    """A pipeline that runs the package unchanged on the Azure-SSIS IR, and
+    what has to be set up by hand for it to reach its connections."""
+    manual = []
+    props: dict = {}
+    names = {c.name for c in pkg.connections}
+    if "DW" in names:
+        # The catalog's project parameter points at the on-premises warehouse;
+        # in Azure the package uses Azure SQL with the IR's managed identity.
+        props["projectParameters"] = {"DW_ConnectionString": {"value": LIFTED_DW}}
+        props["propertyOverrides"] = {
+            "\\Package.Connections[DW].Properties[ConnectUsingManagedIdentity]": {"value": "True", "isSensitive": False}
+        }
+    for c in sorted(names - {"DW"}):
+        manual.append(f"connection {c}: needs a network path from the Azure-SSIS IR (runbook section 1)")
     return {
         "name": pipeline_name(pkg.name),
         "properties": {
@@ -479,22 +567,28 @@ def lift(pkg: Package) -> dict:
                         },
                         "runtime": "x64",
                         "loggingLevel": "Basic",
+                        **props,
                         "connectVia": {"referenceName": "ir-azure-ssis", "type": "IntegrationRuntimeReference"},
                     },
                 }
             ],
             "annotations": ["azure-ssis-ir"],
         },
-    }
+    }, manual
 
 
-def convert_project(folder: Path) -> list[Result]:
+def convert_project(folder: Path, lift_also: set[str] | frozenset[str] = frozenset()) -> list[Result]:
+    """Convert every package; packages with a blocker, and those named in
+    lift_also (packages whose wave has not cut over yet, ADR-0005), are
+    wrapped to run unchanged on the Azure-SSIS IR."""
     assessments = {a.package: a for a in assess_project(folder)}
     out = []
     for pkg in load_project(folder):
         a = assessments[pkg.name]
-        if a.blockers:
-            out.append(Result(pkg.name, lift(pkg), [f"blocked: {i.where}" for i in a.blockers]))
+        if a.blockers or pkg.name in lift_also:
+            pipeline, manual = lift(pkg)
+            why = [f"blocked: {i.where}" for i in a.blockers] or ["lifted until its wave cuts over"]
+            out.append(Result(pkg.name, pipeline, why + manual))
             continue
         c = Converter(pkg)
         out.append(Result(pkg.name, c.convert(), c.manual))
@@ -532,7 +626,13 @@ def support_files() -> dict[str, dict]:
             "ls_erp_sqlserver",
             "SqlServer",
             {
-                "connectionString": "Data Source=ERPSQL01;Initial Catalog=ERP;Integrated Security=False",
+                # SSIS used Windows authentication (SSPI) as the Agent service
+                # account; the factory uses a SQL login (runbook section 1).
+                "server": "ERPSQL01",
+                "database": "ERP",
+                "encrypt": "mandatory",
+                "trustServerCertificate": False,
+                "authenticationType": "SQL",
                 "userName": "svc_adf_erp_reader",
                 "password": {"type": "AzureKeyVaultSecret", "secretName": "erp-sql-password", **kv},
             },
@@ -542,7 +642,10 @@ def support_files() -> dict[str, dict]:
             "ls_dw_azuresql",
             "AzureSqlDatabase",
             {
-                "connectionString": "Data Source=sql-ngbp-dw-dev.database.windows.net;Initial Catalog=NorthgateDW",
+                "server": "sql-ngbp-dw-dev.database.windows.net",
+                "database": "NorthgateDW",
+                "encrypt": "mandatory",
+                "trustServerCertificate": False,
                 "authenticationType": "SystemAssignedManagedIdentity",
             },
         ),
@@ -697,8 +800,9 @@ def main() -> int:  # pragma: no cover
     p = argparse.ArgumentParser()
     p.add_argument("folder", type=Path)
     p.add_argument("--out", type=Path, default=Path("adf"))
+    p.add_argument("--lift", action="append", default=[], help="package to run on the Azure-SSIS IR (repeatable)")
     a = p.parse_args()
-    results = convert_project(a.folder)
+    results = convert_project(a.folder, set(a.lift))
     write(results, a.out)
     for r in results:
         n = len(r.pipeline["properties"]["activities"])
