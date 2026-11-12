@@ -1,0 +1,32 @@
+{
+  "name": "tr_nightly",
+  "properties": {
+    "description": "Was SQL Agent job 'Northgate nightly ETL' (daily 01:30).",
+    "type": "ScheduleTrigger",
+    "runtimeState": "Stopped",
+    "typeProperties": {
+      "recurrence": {
+        "frequency": "Day",
+        "interval": 1,
+        "startTime": "2026-01-01T00:00:00",
+        "timeZone": "Eastern Standard Time",
+        "schedule": {
+          "hours": [
+            1
+          ],
+          "minutes": [
+            30
+          ]
+        }
+      }
+    },
+    "pipelines": [
+      {
+        "pipelineReference": {
+          "referenceName": "pl_master_nightly",
+          "type": "PipelineReference"
+        }
+      }
+    ]
+  }
+}

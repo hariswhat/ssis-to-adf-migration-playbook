@@ -2,9 +2,9 @@
 -- Load_DimCustomer. Called by pl_load_dimcustomer after stg.customer is loaded.
 --
 -- region and tier are type 2 (expire and insert); customer_name is type 1.
--- The comparison of customer_code uses the database collation
--- (SQL_Latin1_General_CP1_CI_AS): case-insensitive and blind to trailing
--- spaces, unlike the SSIS component (docs/adr/0004).
+-- customer_code is compared under the database collation
+-- (SQL_Latin1_General_CP1_CI_AS), so case-insensitively, and SQL Server's =
+-- ignores trailing spaces. The SSIS component did neither (docs/adr/0004).
 
 CREATE OR ALTER PROCEDURE etl.usp_load_dim_customer
     @load_ts DATETIME2(0) = NULL

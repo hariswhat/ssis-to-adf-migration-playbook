@@ -2,8 +2,9 @@
 -- two Lookups, a Derived Column for unknown members and net amount, and a
 -- Conditional Split that sends non-positive quantities to etl.sales_rejected.
 --
--- The joins compare codes under the database collation, case-insensitive and
--- blind to trailing spaces. The SSIS Lookups (full cache) did neither, so
+-- The joins compare codes under the database's case-insensitive collation,
+-- and SQL Server's = ignores trailing spaces. The SSIS Lookups (full cache)
+-- did neither, so
 -- order lines with 'c00042' or 'C00042 ' that used to land on -1 now find
 -- their customer. Reconciliation reports these as an accepted difference
 -- (docs/adr/0004, reconciliation/accepted.yml).

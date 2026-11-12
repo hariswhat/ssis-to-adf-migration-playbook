@@ -48,6 +48,9 @@ def test_references_resolve(results):
     datasets = {b["name"] for k, b in files.items() if k.startswith("dataset/")}
     linked = {b["name"] for k, b in files.items() if k.startswith("linkedService/")}
     irs = {b["name"] for k, b in files.items() if k.startswith("integrationRuntime/")}
+    pipelines_ = {r.pipeline["name"] for r in results.values()}
+    for ref in _refs(files["trigger/tr_nightly.json"], "PipelineReference"):
+        assert ref in pipelines_
     pipelines = {r.pipeline["name"] for r in results.values()}
     for k, b in files.items():
         if k.startswith("dataset/"):
@@ -135,3 +138,16 @@ def test_global_parameters_and_variables_are_declared(results):
         assert set(re.findall(r"globalParameters\.(\w+)", text)) <= globals_
         assert set(re.findall(r"pipeline\(\)\.parameters\.(\w+)", text)) <= set(props.get("parameters", {}))
         assert set(re.findall(r"variables\('(\w+)'\)", text)) <= set(props.get("variables", {}))
+
+
+def test_trigger_follows_the_agent_schedule(tmp_path):
+    from playbook.convert import nightly_trigger
+
+    rec = nightly_trigger()["properties"]["typeProperties"]["recurrence"]
+    assert (rec["schedule"]["hours"], rec["schedule"]["minutes"]) == ([1], [30])
+    jobs = tmp_path / "jobs.yml"
+    jobs.write_text(
+        "jobs:\n  - name: x\n    schedule: weekly 02:00\n    steps:\n      - package: P/Master_Nightly.dtsx\n"
+    )
+    with pytest.raises(ValueError, match="only daily"):
+        nightly_trigger(jobs)

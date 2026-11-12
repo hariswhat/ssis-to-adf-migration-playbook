@@ -1,6 +1,7 @@
 -- DuckDB copy of etl.usp_load_fact_sales, for the reconciliation example.
--- Codes compared as UPPER(RTRIM(...)) to behave like SQL Server's
--- case-insensitive collation (see load_dim_customer.sql).
+-- Codes compared as UPPER(RTRIM(...)) to behave like SQL Server
+-- (see load_dim_customer.sql). Unlike the procedure it builds the tables
+-- from empty, which is all the one-night example needs.
 
 CREATE OR REPLACE TABLE fact_sales AS
 SELECT

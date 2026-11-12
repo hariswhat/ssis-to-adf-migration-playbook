@@ -35,6 +35,8 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import yaml
+
 from .assess import PATTERNS, assess_project
 from .dtsx import Package, Task, load_project
 
@@ -48,6 +50,7 @@ COPY_SHAPED = {
 DEPENDENCY = {0: "Succeeded", 1: "Failed", 2: "Completed"}
 LINKED = {"ERP": "ls_erp_sqlserver", "DW": "ls_dw_azuresql", "DealerFile": "ls_fileshare"}
 SSIS_FOLDER = "NorthgateETL"
+JOBS = Path(__file__).resolve().parents[1] / "estate" / "agent_jobs.yml"
 
 
 @dataclass
@@ -643,8 +646,41 @@ def support_files() -> dict[str, dict]:
                 }
             },
         },
+        "trigger/tr_nightly.json": nightly_trigger(),
     }
     return files
+
+
+def nightly_trigger(jobs_file: Path = JOBS) -> dict:
+    """The SQL Agent schedule of the job that runs Master_Nightly, as a
+    schedule trigger. Agent ran in the server's local time (Eastern)."""
+    job = next(
+        j
+        for j in yaml.safe_load(jobs_file.read_text())["jobs"]
+        if any(Path(s.get("package", "")).stem == "Master_Nightly" for s in j["steps"])
+    )
+    every, at = job["schedule"].split()
+    if every != "daily":
+        raise ValueError(f"only daily schedules are converted, not {job['schedule']!r}")
+    hour, minute = (int(x) for x in at.split(":"))
+    return {
+        "name": "tr_nightly",
+        "properties": {
+            "description": f"Was SQL Agent job '{job['name']}' ({job['schedule']}).",
+            "type": "ScheduleTrigger",
+            "runtimeState": "Stopped",
+            "typeProperties": {
+                "recurrence": {
+                    "frequency": "Day",
+                    "interval": 1,
+                    "startTime": "2026-01-01T00:00:00",
+                    "timeZone": "Eastern Standard Time",
+                    "schedule": {"hours": [hour], "minutes": [minute]},
+                }
+            },
+            "pipelines": [{"pipelineReference": {"referenceName": "pl_master_nightly", "type": "PipelineReference"}}],
+        },
+    }
 
 
 def write(results: list[Result], out: Path) -> None:

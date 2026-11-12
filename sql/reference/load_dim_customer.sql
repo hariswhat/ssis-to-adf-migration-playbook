@@ -1,9 +1,9 @@
 -- DuckDB copy of etl.usp_load_dim_customer, for the reconciliation example.
 -- Same statements in the same order; the only change is how the comparison of
--- customer_code is written. SQL Server's case-insensitive collation also
--- ignores trailing spaces in =, which DuckDB does not, so the code is
--- compared as UPPER(RTRIM(...)) here. tests/test_reference_sql.py checks that
--- both files keep the same statements.
+-- customer_code is written. SQL Server compares it case-insensitively (the
+-- database collation) and its = ignores trailing spaces; DuckDB does neither,
+-- so the code is compared as UPPER(RTRIM(...)) here.
+-- tests/test_reconcile.py checks that both files keep the same statements.
 
 UPDATE dim_customer AS d
 SET customer_name = s.customer_name
