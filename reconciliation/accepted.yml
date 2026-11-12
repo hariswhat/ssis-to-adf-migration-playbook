@@ -1,0 +1,14 @@
+# Differences between the SSIS packages and their replacements that were
+# reviewed and accepted. playbook/reconcile.py matches each difference against
+# these; anything unmatched fails the comparison. Add an entry only with the
+# ADR or decision record that accepts the change.
+accepted:
+  - id: code_case_or_trailing_space
+    matcher: code_case_or_trailing_space
+    tables: [fact_sales, sales_rejected]
+    adr: docs/adr/0004
+    reason: >
+      The SSIS Lookup compared codes exactly, so an order line with 'c00042' or
+      'C00042 ' got the unknown customer (-1). The SQL join uses the database's
+      case-insensitive collation and finds the customer. Finance agreed these
+      sales belong to the customer.
